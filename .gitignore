@@ -1,6 +1,7 @@
 # Large temporary data files
 hmda_output/*.csv
 hmda_output/tmp*.csv
+hmda_output/cache/
 
 # Python
 __pycache__/

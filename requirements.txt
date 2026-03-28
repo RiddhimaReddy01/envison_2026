@@ -1,0 +1,7 @@
+dash
+plotly
+pandas
+polars
+requests
+pyarrow
+numpy
