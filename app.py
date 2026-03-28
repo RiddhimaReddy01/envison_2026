@@ -115,9 +115,21 @@ def kpi(number, label, color=None, note=None):
     ], className="kpi-soft", style={"background":C["surface"],"borderRadius":"6px",
               "padding":"14px 16px","flex":"1","minWidth":"130px","border":f"0.5px solid {C['border']}"})
 
-def kpi_row(items):
-    return html.Div(items, style={"display":"flex","gap":"10px",
-                                  "flexWrap":"wrap","marginBottom":"20px"})
+def kpi_row(items, center=False):
+    style = {
+        "display":"flex",
+        "gap":"10px",
+        "flexWrap":"wrap",
+        "marginBottom":"20px",
+        "alignItems":"stretch",
+    }
+    if center:
+        style.update({
+            "justifyContent":"center",
+            "maxWidth":"980px",
+            "margin":"0 auto 20px",
+        })
+    return html.Div(items, style=style)
 
 def chapter_title(num, title, subtitle):
     return html.Div([
@@ -240,18 +252,23 @@ def p1(mode):
     top1 = float(r2007["share"].iloc[0]) if len(r2007) else 0.0
     top2 = float(r2007["share"].iloc[1]) if len(r2007) > 1 else 0.0
     conc_gap_pp = (top1 - top2) * 100.0
+    gov_2007 = float(r2007[r2007["loan_type"].isin(["FHA", "VA", "FSA/RHS"])]["share"].sum()) if len(r2007) else 0.0
     pre_2007 = collapse[collapse["year"] == 2007]["origination_rate"]
     pre_2008 = collapse[collapse["year"] == 2008]["origination_rate"]
+    is_proxy = bool(a2007["is_proxy"].iloc[0]) if len(a2007) and "is_proxy" in a2007.columns else False
     pre_msg = "Approval trend before the break is flat in the current scoped series."
-    vet_msg = "If your denial patch is loaded, this panel will show pre-crisis weakening directly."
+    vet_msg = "This panel uses your current action-taken coverage."
     if len(pre_2007) and len(pre_2008) and float(pre_2007.iloc[0]) > 0:
         delta = (float(pre_2008.iloc[0]) / float(pre_2007.iloc[0])) - 1.0
         if delta < -0.005:
             pre_msg = f"Approval rates were already softening before the break ({delta:.1%} vs 2007)."
-            vet_msg = "Pre-crisis approval drift is visible directly from the yearly application-originations ratio."
+            vet_msg = "Pre-crisis approval drift is visible in the yearly application-originations ratio."
         elif delta > 0.005:
             pre_msg = f"Approval rates were rising pre-break in this series ({delta:.1%} vs 2007)."
             vet_msg = "This panel reflects your current scoped denominator and action-taken coverage."
+    if is_proxy:
+        pre_msg = f"{pre_msg} (Proxy series from anchored denial rates due to scoped originated-loan HMDA file.)"
+        vet_msg = "Because this run is originated-loans scoped, approval trend is proxy-estimated from documented denial anchors."
 
     return html.Div([
         chapter_title(1, "Before It Broke", "Scale was visible. Fragility was hidden in plain sight."),
@@ -259,7 +276,6 @@ def p1(mode):
             kpi(f"{approval_2007:.0%}", "Approval rate in 2007", C["govt"], "Originations / applications"),
             kpi(conv_2007_plus, "Conventional share in 2007", C["warning"], "Private-market dominance"),
         ]),
-        insight_chip(f"So what: In 2007, the largest channel exceeded the runner-up by {conc_gap_pp:.0f} percentage points.", C["warning"]),
         card([
             html.Div("Credit Access (Primary Signal)", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
             G(ch.fig_ch1_scale_speed(collapse), "ch1-access"),
@@ -269,48 +285,19 @@ def p1(mode):
                 mode,
             )
         ]),
-        html.Div([
-            html.Div([
-                card([
-                    html.Div("Market Structure", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
-                    G(ch.fig_ch1_risk_mix(risk), "ch1-structure"),
-                    ann(
-                        "This was a monoculture: one dominant credit channel with no serious backup. Concentration, not just size, made the system brittle.",
-                        "The composition is direct from HMDA loan-type shares by year; fragility here is structural concentration.",
-                        mode,
-                    ),
-                    html.Div("Semantic Legend For Market Structure", style={"fontSize": "12px", "fontWeight": "600", "margin": "10px 0 6px"}),
-                    html.Table([
-                        html.Thead(html.Tr([
-                            html.Th("Loan Type", style={"textAlign": "left", "fontSize": "10px", "color": C["muted"], "paddingBottom": "6px", "paddingRight": "8px"}),
-                            html.Th("Economic Role", style={"textAlign": "left", "fontSize": "10px", "color": C["muted"], "paddingBottom": "6px", "paddingRight": "8px"}),
-                            html.Th("System Implication", style={"textAlign": "left", "fontSize": "10px", "color": C["muted"], "paddingBottom": "6px"}),
-                        ])),
-                        html.Tbody([
-                            html.Tr([html.Td("Conventional"), html.Td("Private bank lending"), html.Td("Core system, high exposure")]),
-                            html.Tr([html.Td("FHA"), html.Td("Government-insured"), html.Td("Safety net")]),
-                            html.Tr([html.Td("VA"), html.Td("Targeted lending"), html.Td("Policy support")]),
-                            html.Tr([html.Td("FSA/RHS"), html.Td("Rural programs"), html.Td("Minimal systemic role")]),
-                        ]),
-                    ], style={
-                        "width": "100%",
-                        "fontSize": "10.5px",
-                        "lineHeight": "1.3",
-                        "tableLayout": "fixed",
-                        "borderCollapse": "separate",
-                        "borderSpacing": "0 6px",
-                    }),
-                ])
-            ], style={"flex": "2", "minWidth": "360px"}),
-            html.Div([
-                card([
-                    html.Div("2007 Snapshot", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
-                    G(ch.fig_ch1_snapshot_pie(risk), "ch1-snapshot"),
-                ], pad="18px 18px")
-            ], style={"flex": "1.1", "minWidth": "260px"}),
-        ], style={"display": "flex", "gap": "12px", "flexWrap": "wrap"}),
+        insight_chip("So what: The credit engine was already softening before the official break, indicating lenders were quietly retreating first.", C["govt"]),
+        card([
+            html.Div("2007 Snapshot", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
+            G(ch.fig_ch1_snapshot_pie(risk), "ch1-snapshot"),
+            ann(
+                "The market was a monoculture: conventional loans dominated while the government-backed safety net remained tiny.",
+                "This donut is computed directly from 2007 HMDA loan-type shares.",
+                mode,
+            ),
+        ], pad="18px 18px"),
+        insight_chip(f"So what: The top channel led the runner-up by {conc_gap_pp:.0f} percentage points, with only {gov_2007:.1%} in the government-backed safety net.", C["warning"]),
         
-        key_insight("The key pre-crisis fact was concentration: one private channel carried almost all mortgage risk. Growth masked systemic fragility."),
+        key_insight("Before the crash, concentration risk was already extreme: one private channel carried almost the whole system, with only a thin public backstop."),
     ])
 
 def p2(mode):
@@ -617,7 +604,7 @@ def p7(mode):
             kpi(f"{nonbank_2007:.0%} -> {nonbank_2017:.0%}", "Nonbank share (2007->2017)", C["nonbank"]),
             kpi(str(crossover_year) if crossover_year else "N/A", "First nonbank>=bank year", C["warning"]),
             kpi(f"{black_2007:.1%} -> {black_2017:.1%}", "Black origination share", C["crash"], "Participation share"),
-        ]),
+        ], center=True),
         card([
             html.Div("The Great Handover: banks to shadow banks", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
             G(ch.fig_ch7_handover_race(df_lend), "ch7-handover"),

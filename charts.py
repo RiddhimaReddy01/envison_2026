@@ -1421,7 +1421,7 @@ def fig_ch1_scale_speed(df: pd.DataFrame) -> go.Figure:
 
     fig.update_layout(**_base_layout(
         height=H_SM + 60,
-        title=dict(text="Credit access: approval rate (originations / applications)", font=dict(size=13), x=0, xanchor="left"),
+        title=dict(text="Hidden softening: approval rates falling before the break", font=dict(size=13), x=0, xanchor="left"),
         xaxis=dict(showgrid=False, dtick=1, tickcolor=C["border"]),
         yaxis=dict(title="Approval rate", gridcolor=C["grid"], tickformat=".0%", range=[ymin, ymax]),
         showlegend=False,
@@ -2005,10 +2005,10 @@ def fig_ch7_winners_losers_matrix(df_lender: pd.DataFrame, df_race_share: pd.Dat
     # --- Leader-line annotations for every entity ---
     # Each gets an arrow pulling label clear of the bubble
     label_offsets = {
-        "Nonbanks":          (80,  -50),
+        "Nonbanks":          (92,  -68),
         "Big Banks":         (-90,  50),
-        "Asian households":  (75,  -40),
-        "Black households":  (-90,  55),
+        "Asian households":  (110, -26),
+        "Black households":  (-130, 24),
         "White households":  (70,   40),
     }
     label_colors = {
@@ -2049,7 +2049,7 @@ def fig_ch7_winners_losers_matrix(df_lender: pd.DataFrame, df_race_share: pd.Dat
 
     fig.update_layout(**_base_layout(
         height=H_SM + 140,
-        margin=dict(l=70, r=36, t=52, b=62),
+        margin=dict(l=70, r=36, t=52, b=96),
         title=dict(
             text="The Structural Divide: Who Gained Power, Who Lost Access",
             font=dict(size=13), x=0, xanchor="left",
@@ -2067,7 +2067,7 @@ def fig_ch7_winners_losers_matrix(df_lender: pd.DataFrame, df_race_share: pd.Dat
             tickvals=y_tick_vals,
             ticktext=y_tick_text,
         ),
-        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+        legend=dict(orientation="h", x=0.5, y=-0.16, xanchor="center", yanchor="top"),
     ))
     return fig
 
@@ -2304,21 +2304,104 @@ def fig_ch1_snapshot_pie(df: pd.DataFrame) -> go.Figure:
     fig.add_trace(go.Pie(
         labels=d2007["loan_type"],
         values=d2007["share"],
-        hole=0.45,
+        hole=0.62,
         marker=dict(colors=[C["conventional"], C["fha"], C["va"], C["fsa"]]),
         textinfo="percent",
         textposition="inside",
         sort=False,
     ))
+    conventional = d2007[d2007["loan_type"] == "Conventional"]["share"]
+    gov = d2007[d2007["loan_type"].isin(["FHA", "VA", "FSA/RHS"])]["share"].sum()
+    conv_txt = f"{float(conventional.iloc[0]):.1%}" if len(conventional) else "n/a"
+    fig.add_annotation(
+        x=0.5, y=0.52, xref="paper", yref="paper",
+        text=f"<b>{conv_txt}</b><br>Conventional",
+        showarrow=False,
+        font=dict(size=11, color=C["text"]),
+    )
+    fig.add_annotation(
+        x=0.5, y=0.17, xref="paper", yref="paper",
+        text=f"Gov-backed safety net: {float(gov):.1%}",
+        showarrow=False,
+        font=dict(size=9, color=C["muted"]),
+    )
     fig.update_layout(
         height=230,
         margin=dict(l=10, r=10, t=34, b=10),
         paper_bgcolor=C["bg"],
         plot_bgcolor=C["bg"],
         font=dict(family=FONT, size=11, color=C["text"]),
-        title=dict(text="2007 snapshot", font=dict(size=12), x=0, xanchor="left"),
+        title=dict(text="The conventional monoculture (2007)", font=dict(size=12), x=0, xanchor="left"),
         showlegend=False,
     )
+    return fig
+
+
+def fig_ch1_toxic_tail(df: pd.DataFrame) -> go.Figure:
+    """Chapter 1: 2007 LTI density with toxic-zone highlight."""
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    d = df.copy()
+    year_col = "year" if "year" in d.columns else "as_of_year"
+    if year_col not in d.columns or "lti_ratio" not in d.columns:
+        return fig
+
+    d = d[(d[year_col] == 2007) & d["lti_ratio"].notna()].copy()
+    if d.empty:
+        return fig
+
+    full = d["lti_ratio"].astype(float)
+    display = full.clip(lower=0, upper=8.0)
+    safe = display[display <= 4.5]
+    toxic = display[display > 4.5]
+    tail_share = float((full > 4.5).mean())
+    gt8_share = float((full > 8.0).mean())
+
+    bins = dict(start=0.0, end=8.0, size=0.18)
+    fig.add_trace(go.Histogram(
+        x=safe,
+        xbins=bins,
+        histnorm="probability density",
+        name="LTI <= 4.5",
+        marker=dict(color="rgba(118,118,118,0.65)"),
+        hovertemplate="Safe-zone density: %{y:.3f}<extra></extra>",
+        showlegend=False,
+    ))
+    fig.add_trace(go.Histogram(
+        x=toxic,
+        xbins=bins,
+        histnorm="probability density",
+        name="LTI > 4.5 (toxic zone)",
+        marker=dict(color="rgba(215,38,30,0.75)"),
+        hovertemplate="Toxic-zone density: %{y:.3f}<extra></extra>",
+        showlegend=False,
+    ))
+
+    fig.add_vline(x=4.5, line=dict(color=C["crash"], width=1.5, dash="dash"))
+    fig.add_annotation(
+        x=4.55, y=0.96, xref="x", yref="paper",
+        text="Toxic threshold (LTI > 4.5)",
+        showarrow=False, xanchor="left",
+        font=dict(size=9, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+    )
+    fig.add_annotation(
+        x=0.98, y=0.90, xref="paper", yref="paper",
+        text=f">4.5 share: <b>{tail_share:.1%}</b><br>>8.0 share: {gt8_share:.1%}",
+        showarrow=False, xanchor="right",
+        font=dict(size=9, color=C["text"]),
+        bgcolor="rgba(255,255,255,0.90)", bordercolor=C["border"], borderwidth=0.5, borderpad=4,
+    )
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 80,
+        barmode="overlay",
+        title=dict(text="The toxic tail: extreme leverage in the pre-crisis market (2007)", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(title="Loan-to-income (LTI) ratio", showgrid=False, range=[0, 8.0], tickcolor=C["border"]),
+        yaxis=dict(title="Density of loans", showgrid=True, gridcolor=C["grid"], zeroline=False),
+    ))
     return fig
 
 
@@ -2967,6 +3050,21 @@ def fig_ch7_handover_race(df: pd.DataFrame, top_n: int = 10) -> go.Figure:
         font=dict(size=9, color=C["nonbank"]),
         bgcolor="rgba(255,255,255,0.9)", bordercolor=C["nonbank"], borderwidth=0.5, borderpad=3,
     )
+
+    # Static slide cue: where Quicken/Rocket ends up by 2017, even when slider is at 2007.
+    d17 = d[d["year"] == 2017].sort_values("share", ascending=False).reset_index(drop=True)
+    if not d17.empty:
+        d17["rank_2017"] = np.arange(1, len(d17) + 1)
+        q = d17[d17["institution"].str.contains("quicken|rocket", case=False, regex=True)]
+        if not q.empty:
+            qrow = q.iloc[0]
+            fig.add_annotation(
+                x=0.985, y=0.08, xref="paper", yref="paper",
+                text=f"{qrow['institution']}: Rank #{int(qrow['rank_2017'])} in 2017",
+                showarrow=False, xanchor="right", yanchor="bottom",
+                font=dict(size=10, color=C["nonbank"]),
+                bgcolor="rgba(255,255,255,0.96)", bordercolor=C["nonbank"], borderwidth=0.8, borderpad=4,
+            )
 
     steps = []
     for y in years:
