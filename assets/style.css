@@ -1,10 +1,11 @@
 .card-soft {
-  transition: box-shadow 180ms ease;
-  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.04);
+  transition: box-shadow 180ms ease, transform 180ms ease;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
 }
 
 .card-soft:hover {
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
 }
 
 .kpi-soft {
@@ -12,5 +13,13 @@
 }
 
 .kpi-soft:hover {
-  background-color: #ecefed !important;
+  background-color: #eae7df !important;
+}
+
+.js-plotly-plot .plotly .gtitle {
+  letter-spacing: 0.01em;
+}
+
+.js-plotly-plot .plotly .legend text {
+  font-weight: 500;
 }
