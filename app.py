@@ -291,7 +291,6 @@ def p1(mode):
 
 def p2(mode):
     df = _df_collapse()
-    pr = _df_purchase_refi()
     apps_2008 = int(df[df["year"] == 2008]["applications"].iloc[0]) if len(df[df["year"] == 2008]) else 0
     gap_2011 = int((df[df["year"] == 2011]["applications"].iloc[0] - df[df["year"] == 2011]["originations"].iloc[0])) if len(df[df["year"] == 2011]) else 0
     rate_2011 = float(df[df["year"] == 2011]["origination_rate"].iloc[0]) if len(df[df["year"] == 2011]) else 0.0
@@ -312,8 +311,6 @@ def p2(mode):
                   f"{stat_note} The widening gap tracks credit rationing, not a disappearance of would-be borrowers.",
                   mode),
               src("Federal Reserve Bulletin 2010","CFPB HMDA Data Point")]),
-        card([html.Div("Recovery for whom? Refinance replaced purchase",style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
-              G(ch.fig_purchase_refi_share(pr),"ch2-purchase-refi")]),
     ])
 
 def p3(mode):
@@ -371,6 +368,7 @@ def p3(mode):
 
 def p4(mode):
     df_lti = _df_lti_sample()
+    pr = _df_purchase_refi()
     if not df_lti.empty:
         d = df_lti.copy()
         d["group"] = d["income_band"].map({
@@ -400,12 +398,16 @@ def p4(mode):
         middle_share = 0.0
 
     return html.Div([
-        chapter_title(4,"Who Was Really Over-Leveraged","High leverage was not confined to the poorest borrowers."),
+        chapter_title(4,"A 'Fake' Recovery","High leverage was not confined to the poorest borrowers."),
         kpi_row([kpi(f"{median_lti:.1f}x","Median LTI (sample)",C["warning"]),
                  kpi(f"{mid_peak:.1f}x","Middle-income peak LTI",C["crash"]),
                  kpi(f"{pct_above3:.0%}","Borrowers above 3x threshold",C["crash"]),
                  kpi(f"{top_share:.0%}",f"Largest >3x share: {top_group}",C["recovery"],"Share of all high-leverage loans")]),
         insight_chip(f"So what: Middle-income borrowers account for {middle_share:.0%} of all loans above 3x income in this sample.", C["crash"]),
+        
+        card([html.Div("Recovery for whom? Refinance replaced purchase",style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+              G(ch.fig_purchase_refi_share(pr),"ch4-purchase-refi")]),
+        
         card([html.Div("Who carried the highest leverage?",
                        style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
               G(ch.fig_ch4_lti_income_groups(df_lti),"ch4-lti-groups"),

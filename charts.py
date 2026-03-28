@@ -1562,44 +1562,112 @@ def fig_collapse(df: pd.DataFrame) -> go.Figure:
 
     if df is None or df.empty:
         return fig
-    d = df.sort_values("year")
+    d = df.sort_values("year").copy()
+    d["gap"] = d["applications"] - d["originations"]
+    d["rejection_rate"] = d["gap"] / d["applications"]
 
-    fig.add_trace(go.Scatter(
-        x=d["year"], y=d["applications"],
-        name="Applications",
-        mode="lines",
-        line=dict(color="#1E4D8B", width=3.2, shape="spline", smoothing=0.7),
-        hovertemplate="%{x}: %{y:,.0f}<extra></extra>",
-    ))
-    fig.add_trace(go.Scatter(
+    mortgage_rates = {
+        2007: 6.34, 2008: 6.03, 2009: 5.04, 2010: 4.69, 
+        2011: 4.45, 2012: 3.66, 2013: 3.98, 2014: 4.17, 
+        2015: 3.85, 2016: 3.65, 2017: 3.99
+    }
+    unemployment_rates = {
+        2007: 4.6,  2008: 5.8,  2009: 9.3,  2010: 9.6,  
+        2011: 8.9,  2012: 8.1,  2013: 7.4,  2014: 6.2,  
+        2015: 5.3,  2016: 4.9,  2017: 4.4
+    }
+    
+    d["mortgage_rate"] = d["year"].map(mortgage_rates)
+    d["unemployment_rate"] = d["year"].map(unemployment_rates)
+
+    # 1. Originations (Bottom layer)
+    fig.add_trace(go.Bar(
         x=d["year"], y=d["originations"],
-        name="Originations",
-        mode="lines",
-        line=dict(color=C["crash"], width=3.4, shape="spline", smoothing=0.7),
-        fill="tonexty",
-        fillcolor="rgba(215,38,30,0.24)",
-        hovertemplate="%{x}: %{y:,.0f}<extra></extra>",
+        name="Originations (Approved)",
+        marker_color=C["recovery"],
+        marker_line_width=0,
+        opacity=0.85,
+        hovertemplate="Originated: %{y:,.0f}<extra></extra>",
     ))
 
-    fig.add_vline(x=2008, line=dict(color=C["crash"], width=1.2, dash="dash"))
-    y_anno = float(d["applications"].max()) * 0.86
+    # 2. Unmet Demand (Top layer)
+    fig.add_trace(go.Bar(
+        x=d["year"], y=d["gap"],
+        name="Unmet Demand (Gap)",
+        marker=dict(
+            color="rgba(199,37,42,0.15)",  # light red
+            line=dict(color=C["crash"], width=1.5)
+        ),
+        hovertemplate="Unmet demand: %{y:,.0f}<extra></extra>",
+    ))
+    
+    # 3. Mortgage Rate (Secondary Y-axis Line)
+    fig.add_trace(go.Scatter(
+        x=d["year"], y=d["mortgage_rate"],
+        name="30-Year Mortgage Rate",
+        mode="lines+markers",
+        yaxis="y2",
+        line=dict(color="#DE9E36", width=2.5, dash="dot"),
+        marker=dict(size=7, color="#DE9E36", symbol="diamond"),
+        hovertemplate="Mortgage Rate: %{y:.2f}%<extra></extra>",
+    ))
+    
+    # 4. Unemployment Rate (Secondary Y-axis Line)
+    fig.add_trace(go.Scatter(
+        x=d["year"], y=d["unemployment_rate"],
+        name="Unemployment Rate",
+        mode="lines+markers",
+        yaxis="y2",
+        line=dict(color="#285C9A", width=2.5, dash="dash"),
+        marker=dict(size=7, color="#285C9A", symbol="square"),
+        hovertemplate="Unemployment: %{y:.1f}%<extra></extra>",
+    ))
+
+    # 5. Add rejection rate as text directly on top of the bars
+    for i, row in d.iterrows():
+        fig.add_annotation(
+            x=row["year"],
+            y=row["applications"],
+            text=f"{row['rejection_rate']:.0%}",
+            showarrow=False,
+            yshift=12,
+            font=dict(size=10, color=C["crash"], weight="bold")
+        )
+
+    # 6. Crisis line indicator
+    fig.add_vline(x=2008, line=dict(color=C["crash"], width=1, dash="dash"))
+    
+    y_anno = float(d["applications"].max()) * 0.88
     fig.add_annotation(
-        x=2011,
+        x=2015.5,
         y=y_anno,
-        text="The shaded gap is unmet credit demand.",
+        text="<b>The red box is UNMET DEMAND.</b><br>Notice how rejection rates spike post-2008.",
         showarrow=False,
-        font=dict(size=10, color="#8F1D1A"),
+        font=dict(size=11, color=C["crash"]),
         bgcolor="rgba(255,245,245,0.96)",
         bordercolor=C["crash"],
         borderwidth=0.5,
-        borderpad=4,
+        borderpad=6,
+        xanchor="center"
     )
 
     fig.update_layout(**_base_layout(
         height=H,
-        title=dict(text="Credit gap: applications vs originations", font=dict(size=13), x=0, xanchor="left"),
+        barmode="stack",
+        bargap=0.3,
+        title=dict(text="Credit gap & Macro environment (Rates & Employment)", font=dict(size=14, weight="bold"), x=0, xanchor="left"),
         xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], automargin=True),
         yaxis=dict(title="Loan count", gridcolor=C["grid"], zeroline=False, tickformat=".2s", automargin=True),
+        yaxis2=dict(
+            title="Rates (%)",
+            overlaying="y",
+            side="right",
+            showgrid=False,
+            zeroline=False,
+            tickformat=".1f",
+            range=[0, 11]  # Expanded to fit the ~10% unemployment peak
+        ),
+        legend=dict(orientation="h", y=1.05, x=0, xanchor="left", font=dict(size=11))
     ))
     return fig
 
@@ -1798,48 +1866,52 @@ def fig_ch4_above_3x(df: pd.DataFrame) -> go.Figure:
 
 
 def fig_purchase_refi_share(df: pd.DataFrame) -> go.Figure:
-    """Chapter 2: show composition shift with purchase/refinance shares."""
+    """Chapter 2: show composition shift with a clean Line Chart."""
     fig = go.Figure()
     if df is None or df.empty:
         return fig
 
     d = df.sort_values("year").copy()
-    total = d["purchase"] + d["refinance"]
-    d["purchase_share"] = d["purchase"] / total.replace(0, pd.NA)
-    d["refi_share"] = d["refinance"] / total.replace(0, pd.NA)
 
+    # 1. New Home Purchases (Solid Line)
     fig.add_trace(go.Scatter(
-        x=d["year"], y=d["purchase_share"],
-        mode="lines", name="Purchase share",
-        line=dict(color=C["purchase"], width=1.8, shape="spline", smoothing=0.7),
-        stackgroup="one", groupnorm="fraction", fill="tozeroy",
-        hovertemplate="Purchase share<br>%{x}: %{y:.1%}<extra></extra>",
-    ))
-    fig.add_trace(go.Scatter(
-        x=d["year"], y=d["refi_share"],
-        mode="lines", name="Refinance share",
-        line=dict(color=C["refi"], width=1.8, shape="spline", smoothing=0.7),
-        stackgroup="one", groupnorm="fraction", fill="tonexty",
-        hovertemplate="Refinance share<br>%{x}: %{y:.1%}<extra></extra>",
+        x=d["year"], y=d["purchase"],
+        name="New Home Purchases",
+        mode="lines+markers",
+        line=dict(color=C["purchase"], width=3),
+        marker=dict(size=8, symbol="circle"),
+        hovertemplate="Purchases: %{y:,.0f}<extra></extra>",
     ))
 
+    # 2. Refinancing (Dashed Line)
+    fig.add_trace(go.Scatter(
+        x=d["year"], y=d["refinance"],
+        name="Refinancing",
+        mode="lines+markers",
+        line=dict(color=C["refi"], width=3, dash="dot"),
+        marker=dict(size=8, symbol="square"),
+        hovertemplate="Refinancing: %{y:,.0f}<extra></extra>",
+    ))
+
+    # 3. Annotate the 2012 Refi Boom
+    max_refi = d.loc[d["refinance"].idxmax()]
     fig.add_annotation(
-        x=2013,
-        y=0.88,
-        text="Post-crisis recovery was dominated by refinancing rather than new purchases.",
+        x=max_refi["year"],
+        y=max_refi["refinance"] + 250000,
+        text=f"<b>A 'Fake' Recovery</b><br>Refinance applications spiked entirely independent of purchases.",
         showarrow=False,
-        font=dict(size=10, color=C["warning"]),
-        bgcolor="rgba(255,255,255,0.92)",
-        bordercolor=C["warning"],
+        font=dict(size=11, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.9)",
+        bordercolor=C["crash"],
         borderwidth=0.5,
-        borderpad=4,
+        borderpad=4
     )
 
     fig.update_layout(**_base_layout(
         height=H,
-        title=dict(text="The rebound was refinancing, not home buying", font=dict(size=13), x=0, xanchor="left"),
         xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], automargin=True),
-        yaxis=dict(gridcolor=C["grid"], zeroline=False, tickformat=".0%", title="Share of mortgage activity", range=[0, 1], automargin=True),
+        yaxis=dict(gridcolor=C["grid"], zeroline=False, tickformat=".1s", title="Absolute Loan Count", automargin=True),
+        legend=dict(orientation="h", x=0, y=1.05, xanchor="left", yanchor="bottom")
     ))
     return fig
 
