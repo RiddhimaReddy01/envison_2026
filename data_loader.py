@@ -140,6 +140,61 @@ def lti_sample():
     })
 
 
+def bank_nonbank_survival():
+    """
+    Ch 5: Bank vs nonbank origination share by year 2007-2017.
+    agency_code == 7 → nonbank (HUD-supervised).
+    Shows the structural shift: banks 70% → 31%, nonbanks 30% → 69%.
+    """
+    if USE_REAL_DATA and _real_available():
+        df = _load("lender_names.parquet")
+        if df is not None and "agency_code" in df.columns:
+            df = df.with_columns(
+                pl.when(pl.col("agency_code") == 7)
+                  .then(pl.lit("Nonbank"))
+                  .otherwise(pl.lit("Bank"))
+                  .alias("lender_type")
+            )
+            bytype = (
+                df.group_by(["year", "lender_type"])
+                  .agg(pl.col("originations").sum())
+            )
+            totals = bytype.group_by("year").agg(pl.col("originations").sum().alias("total"))
+            return (
+                bytype.join(totals, on="year")
+                .with_columns((pl.col("originations") / pl.col("total")).alias("share"))
+                .sort(["year", "lender_type"])
+            )
+    return pl.DataFrame(schema={
+        "year": pl.Int32, "lender_type": pl.Utf8,
+        "originations": pl.Int64, "total": pl.Int64, "share": pl.Float64,
+    })
+
+
+def recovery_vs_affordability():
+    """
+    Ch 5: Recovery speed (rvs_years) vs 2017 LTI ratio per state.
+    Fast-recovery states became unaffordable — the recovery trap.
+    """
+    if USE_REAL_DATA and _real_available():
+        rvs = _load("rvs_by_state.parquet")
+        sample = _load("hmda_sample.parquet")
+        if rvs is None or sample is None:
+            return pl.DataFrame(schema={
+                "state": pl.Utf8, "rvs_years": pl.Int32, "median_lti_2017": pl.Float64,
+            })
+        lti_2017 = (
+            sample.filter(pl.col("as_of_year") == 2017)
+            .group_by("state_code")
+            .agg(pl.col("lti_ratio").median().alias("median_lti_2017"))
+            .rename({"state_code": "state"})
+        )
+        return rvs.join(lti_2017, on="state", how="inner")
+    return pl.DataFrame(schema={
+        "state": pl.Utf8, "rvs_years": pl.Int32, "median_lti_2017": pl.Float64,
+    })
+
+
 def rvs_scores():
     """Ch 5: Recovery Velocity Score per state"""
     if USE_REAL_DATA and _real_available():

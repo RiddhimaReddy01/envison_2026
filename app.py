@@ -1,5 +1,5 @@
-"""
-app.py — Envision Hackathon 2026  (FINAL)
+﻿"""
+app.py â€” Envision Hackathon 2026  (FINAL)
 ==========================================
 Post-Crisis Lending Landscape: A Documentary in Data
 
@@ -13,6 +13,7 @@ When real data arrives:
 """
 
 from functools import lru_cache
+import traceback
 
 import dash
 from dash import dcc, html, Input, Output
@@ -22,13 +23,21 @@ import data_loader as dl
 import charts as ch
 
 C = {
-    "bg":"#FAFAF7","surface":"#F1F3F2","border":"rgba(17,24,39,0.14)",
-    "text":"#1F252D","muted":"#5F6976","crash":"#C7252A",
-    "recovery":"#1E6B4A","govt":"#0B4F8A","veteran":"#4F4B7A",
-    "civilian":"#0F5A7A","warning":"#B36A00","nonbank":"#A84A34",
+    "bg":"#F7F5F0",
+    "surface":"#EFEDE7",
+    "border":"rgba(20,20,20,0.16)",
+    "text":"#1A1A1A",
+    "muted":"#5B5B5B",
+    "crash":"#D7261E",
+    "recovery":"#2C7A5A",
+    "govt":"#285C9A",
+    "veteran":"#4F4B7A",
+    "civilian":"#0F5A7A",
+    "warning":"#A6761D",
+    "nonbank":"#A84A34",
 }
 FONT  = "'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-FONT_SERIF = "'Merriweather', Georgia, 'Times New Roman', serif"
+FONT_SERIF = "'Libre Baskerville', Georgia, 'Times New Roman', serif"
 YEARS = list(range(2007,2018))
 
 app = dash.Dash(__name__, title="Post-Crisis Lending 2007-2017",
@@ -61,9 +70,6 @@ def _df_rvs_scores():
 def _df_state_year_originations():
     return dl.state_year_originations().to_pandas()
 
-@lru_cache(maxsize=1)
-def _df_msa_scissor():
-    return dl.msa_scissor().to_pandas()
 
 @lru_cache(maxsize=1)
 def _df_denial_rates():
@@ -85,10 +91,18 @@ def _df_purchase_homeownership():
 def _df_lender_bubble():
     return dl.lender_bubble().to_pandas()
 
+@lru_cache(maxsize=1)
+def _df_bank_nonbank():
+    return dl.bank_nonbank_survival().to_pandas()
+
+@lru_cache(maxsize=1)
+def _df_recovery_affordability():
+    return dl.recovery_vs_affordability().to_pandas()
+
 def card(children, pad="24px 28px", mb="16px"):
     return html.Div(children, className="card-soft", style={
         "background":C["bg"],"border":f"0.5px solid {C['border']}",
-        "borderRadius":"12px","padding":pad,"marginBottom":mb,
+        "borderRadius":"10px","padding":pad,"marginBottom":mb,
     })
 
 def kpi(number, label, color=None, note=None):
@@ -98,27 +112,24 @@ def kpi(number, label, color=None, note=None):
         html.Div(label,  style={"fontSize":"12px","color":C["muted"],"marginTop":"4px"}),
         html.Div(note,   style={"fontSize":"10px","color":C["muted"],"marginTop":"2px",
                                 "fontStyle":"italic"}) if note else None,
-    ], className="kpi-soft", style={"background":C["surface"],"borderRadius":"8px",
-              "padding":"14px 16px","flex":"1","minWidth":"130px"})
+    ], className="kpi-soft", style={"background":C["surface"],"borderRadius":"6px",
+              "padding":"14px 16px","flex":"1","minWidth":"130px","border":f"0.5px solid {C['border']}"})
 
 def kpi_row(items):
     return html.Div(items, style={"display":"flex","gap":"10px",
                                   "flexWrap":"wrap","marginBottom":"20px"})
 
 def chapter_title(num, title, subtitle):
-    bg = {1:"#FCEBEB",2:"#FAEEDA",3:"#E1F5EE",4:"#E6F1FB",
-          5:"#EEEDFE",6:"#FAECE7",7:"#EAF3DE"}
-    fc = {1:"#A32D2D",2:"#854F0B",3:"#0F6E56",4:"#185FA5",
-          5:"#534AB7", 6:"#993C1D",7:"#3B6D11"}
     return html.Div([
         html.Div([
             html.Span(str(num), style={
                 "display":"inline-flex","alignItems":"center","justifyContent":"center",
                 "width":"28px","height":"28px","borderRadius":"50%",
-                "background":bg.get(num,C["surface"]),"color":fc.get(num,C["text"]),
+                "background":"#FCE9E7","color":C["crash"],
                 "fontSize":"12px","fontWeight":"500","marginRight":"10px","flexShrink":"0",
+                "border":f"0.5px solid {C['border']}",
             }),
-            html.Span(title, style={"fontSize":"21px","fontWeight":"700","fontFamily":FONT_SERIF}),
+            html.Span(title, style={"fontSize":"22px","fontWeight":"700","fontFamily":FONT_SERIF,"letterSpacing":"0.01em"}),
         ], style={"display":"flex","alignItems":"center","marginBottom":"5px"}),
         html.P(subtitle, style={"fontSize":"13px","color":C["muted"],"margin":"0 0 20px 38px"}),
     ])
@@ -152,7 +163,13 @@ def data_note(text):
                "background":"rgba(239,159,39,0.06)","border":"0.5px solid rgba(239,159,39,0.4)"})
 
 def insight_chip(text, color=None):
-    return html.Div(text, style={
+    clean = (text or "").strip()
+    if clean.lower().startswith("so what:"):
+        clean = clean.split(":", 1)[1].strip()
+    return html.Div([
+        html.Span("Takeaway: ", style={"fontWeight":"700", "color":C["text"]}),
+        clean
+    ], style={
         "fontSize":"12px","fontWeight":"600","color":color or C["text"],
         "padding":"8px 12px","borderRadius":"999px","display":"inline-block",
         "background":"#F4F1E8","border":"0.5px solid rgba(17,24,39,0.16)",
@@ -209,7 +226,7 @@ def navbar(active=1):
               "background":C["bg"],"borderBottom":f"0.5px solid {C['border']}",
               "position":"sticky","top":"0","zIndex":"100","fontFamily":FONT})
 
-# ── Pages ──────────────────────────────────────────────
+# â”€â”€ Pages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def p1(mode):
     collapse = _df_collapse()
@@ -373,179 +390,197 @@ def p3(mode):
 def p4(mode):
     df_lti = _df_lti_sample()
     pr = _df_purchase_refi()
-    if not df_lti.empty:
-        d = df_lti.copy()
-        d["group"] = d["income_band"].map({
-            "<50K": "Low income (<50K)",
-            "50-80K": "Middle income (50-100K)",
-            "80-100K": "Middle income (50-100K)",
-            "100-150K": "Higher income (100K+)",
-            "150K+": "Higher income (100K+)",
-        })
-        d = d.dropna(subset=["group", "lti_ratio"])
-    else:
-        d = df_lti
+    ho = _df_purchase_homeownership()
+    col = _df_collapse()
 
-    median_lti = float(d["lti_ratio"].median()) if not d.empty else 0.0
-    mid_peak = float(d[d["group"] == "Middle income (50-100K)"]["lti_ratio"].max()) if not d.empty and len(d[d["group"] == "Middle income (50-100K)"]) else 0.0
-    pct_above3 = float((d["lti_ratio"] > 3).mean()) if not d.empty else 0.0
-    if not d.empty:
-        x = d.copy()
-        x["gt3"] = x["lti_ratio"] > 3
-        contrib = x.groupby("group")["gt3"].sum()
-        top_group = str(contrib.idxmax()) if len(contrib) else "Middle income (50-100K)"
-        top_share = float(contrib.max() / contrib.sum()) if len(contrib) and contrib.sum() else 0.0
-        middle_share = float(x[x["group"] == "Middle income (50-100K)"]["gt3"].sum() / x["gt3"].sum()) if x["gt3"].sum() else 0.0
-    else:
-        top_group = "Middle income (50-100K)"
-        top_share = 0.0
-        middle_share = 0.0
+    refi_share_peak = 0.0
+    peak_year = 2012
+    if not pr.empty and "purchase_pct" in pr.columns:
+        tmp = pr.copy()
+        tmp["refi_share"] = 1.0 - tmp["purchase_pct"]
+        peak = tmp.loc[tmp["refi_share"].idxmax()] if len(tmp) else None
+        if peak is not None:
+            refi_share_peak = float(peak["refi_share"])
+            peak_year = int(peak["year"])
+
+    h2007 = float(ho[ho["year"] == 2007]["homeownership_rate"].iloc[0]) if len(ho[ho["year"] == 2007]) else 0.0
+    h2017 = float(ho[ho["year"] == 2017]["homeownership_rate"].iloc[0]) if len(ho[ho["year"] == 2017]) else 0.0
+    home_growth = ((h2017 - h2007) / h2007) if h2007 else 0.0
+
+    y2007 = float(col[col["year"] == 2007]["origination_rate"].iloc[0]) if len(col[col["year"] == 2007]) else 0.0
+    y2017 = float(col[col["year"] == 2017]["origination_rate"].iloc[0]) if len(col[col["year"] == 2017]) else 0.0
+
+    hollow_index = refi_share_peak / max(abs(home_growth), 0.01)
 
     return html.Div([
-        chapter_title(4,"A 'Fake' Recovery","High leverage was not confined to the poorest borrowers."),
-        kpi_row([kpi(f"{median_lti:.1f}x","Median LTI (sample)",C["warning"]),
-                 kpi(f"{mid_peak:.1f}x","Middle-income peak LTI",C["crash"]),
-                 kpi(f"{pct_above3:.0%}","Borrowers above 3x threshold",C["crash"]),
-                 kpi(f"{top_share:.0%}",f"Largest >3x share: {top_group}",C["recovery"],"Share of all high-leverage loans")]),
-        insight_chip(f"So what: Middle-income borrowers account for {middle_share:.0%} of all loans above 3x income in this sample.", C["crash"]),
-        
-        card([html.Div("Recovery for whom? Refinance replaced purchase",style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
-              G(ch.fig_purchase_refi_share(pr),"ch4-purchase-refi")]),
-        
-        card([html.Div("Who carried the highest leverage?",
-                       style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
-              G(ch.fig_ch4_lti_income_groups(df_lti),"ch4-lti-groups"),
-              ann("The uncomfortable finding: middle-income borrowers were not insulated; they carried a large block of >3x leverage.",
-                  "This separates intensity from volume: high ratios exist broadly, but the middle contributes more high-leverage mass.",
-                  mode),
-              src("NBER WP 23740","MIT Sloan / Schoar")]),
-        card([html.Div("How widespread was high leverage?",
-                       style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
-              G(ch.fig_ch4_above_3x(df_lti),"ch4-above3")]),
-        card([
-            html.Div(
-                "Leverage risk was distributed across the ladder, with middle-income households central to the exposure base.",
-                style={"fontSize":"15px","fontWeight":"500","fontStyle":"italic","textAlign":"center"},
-            )
-        ], pad="16px 22px"),
-    ])
+        chapter_title(4, "The Refi Mirage", "Volume recovered, but ownership formation did not keep pace."),
+        kpi_row([
+            kpi(f"{refi_share_peak:.0%}", f"Peak refinance share ({peak_year})", C["crash"], "Share of total mortgage activity"),
+            kpi(f"{h2007:.1f}% -> {h2017:.1f}%", "Homeownership rate (2007->2017)", C["warning"]),
+            kpi(f"{y2007:.0%} -> {y2017:.0%}", "Origination yield (2007->2017)", C["govt"], "Originations / applications"),
+            kpi(f"{hollow_index:.1f}", "Hollow Index", C["crash"], "Refi share / |homeownership growth|"),
+        ]),
+        insight_chip("The recovery looked large in volume, but much of it was refinance churn rather than new ownership access.", C["crash"]),
 
+        card([
+            G(ch.fig_ch4_refi_mirage(pr, ho), "ch4-refi-mirage"),
+            ann(
+                "When refinance dominates and homeownership stalls, activity is not the same as access.",
+                "Peak-volume years were debt rotation years, not broad household entry years.",
+                mode,
+            ),
+        ]),
+
+        card([
+            G(ch.fig_ch4_yield_attrition(col, 2007, 2017), "ch4-yield"),
+            ann(
+                "The funnel got smaller even as conversion improved, which means fewer total participants made it through.",
+                "Efficiency improved on paper, while the addressable market thinned in practice.",
+                mode,
+            ),
+        ]),
+
+        card([
+            html.Div("The Squeezed Middle: middle-income leverage is accelerating fastest", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
+            G(ch.fig_ch4_lti_income_groups(df_lti), "ch4-lti-groups"),
+            ann(
+                "Middle-income leverage has climbed the fastest from trough and is now closest to the safety ceiling.",
+                "The risk center moved toward the middle of the distribution even without being the absolute highest line.",
+                mode,
+            ),
+        ]),
+    ])
 def p5(mode):
-    df_rvs = _df_rvs_scores()
-    df_msa = _df_msa_scissor()
-    fast = int((df_rvs["rvs_years"] <= 2).sum()) if not df_rvs.empty else 0
-    medium = int(((df_rvs["rvs_years"] >= 3) & (df_rvs["rvs_years"] <= 4)).sum()) if not df_rvs.empty else 0
-    slow = int((df_rvs["rvs_years"] >= 5).sum()) if not df_rvs.empty else 0
+    df_rvs  = _df_rvs_scores()
+    df_bn   = _df_bank_nonbank()
+    df_ra   = _df_recovery_affordability()
+
+    fast      = int((df_rvs["rvs_years"] <= 2).sum()) if not df_rvs.empty else 0
+    slow      = int((df_rvs["rvs_years"] >= 5).sum()) if not df_rvs.empty else 0
     min_years = int(df_rvs["rvs_years"].min()) if not df_rvs.empty else 0
     max_years = int(df_rvs["rvs_years"].max()) if not df_rvs.empty else 0
-    latest_msa_year = int(df_msa["year"].max()) if not df_msa.empty else 2017
-    lti_over3 = int((df_msa[df_msa["year"] == latest_msa_year]["median_lti"] > 3).sum()) if not df_msa.empty else 0
-    bridge_text = "The markets that recovered fastest often saw the largest increases in loan-to-income ratios."
-    bridge_note = "Pattern statement"
-    if not df_rvs.empty and not df_msa.empty:
-        latest = int(df_msa["year"].max())
-        m = df_msa[df_msa["year"] == latest][["msa", "median_lti"]].copy()
-        m["msa"] = m["msa"].astype(str)
-        m = m[m["msa"].str.len() == 2]
-        j = df_rvs.merge(m, left_on="state", right_on="msa", how="inner")
-        if len(j) >= 4:
-            fast_mean = float(j[j["rvs_years"] <= 2]["median_lti"].mean()) if len(j[j["rvs_years"] <= 2]) else float("nan")
-            slow_mean = float(j[j["rvs_years"] >= 5]["median_lti"].mean()) if len(j[j["rvs_years"] >= 5]) else float("nan")
-            corr = float(j["rvs_years"].corr(j["median_lti"])) if j["median_lti"].nunique() > 1 else 0.0
-            if fast_mean == fast_mean and slow_mean == slow_mean:
-                if fast_mean > slow_mean:
-                    bridge_text = f"Fast-recovery states show higher latest LTI on average ({fast_mean:.2f}x) than slow-recovery states ({slow_mean:.2f}x)."
-                else:
-                    bridge_text = f"Latest LTI is not higher in fast-recovery states ({fast_mean:.2f}x) than slow-recovery states ({slow_mean:.2f}x)."
-            bridge_note = f"Computed on state overlap (n={len(j)}), corr(recovery years, LTI)={corr:.2f}"
-    spread_years = max_years - min_years
+
+    # Bank vs nonbank crossover year
+    bank_share_2017 = float(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]["share"].iloc[0]) if not df_bn.empty and len(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]) else 0.0
+    nonbank_share_2017 = 1.0 - bank_share_2017
+
+    # Recovery trap insight
+    fast_lti = float(df_ra[df_ra["rvs_years"] <= 2]["median_lti_2017"].mean()) if not df_ra.empty and len(df_ra[df_ra["rvs_years"] <= 2]) else 0.0
+    slow_lti = float(df_ra[df_ra["rvs_years"] >= 5]["median_lti_2017"].mean()) if not df_ra.empty and len(df_ra[df_ra["rvs_years"] >= 5]) else 0.0
 
     return html.Div([
-        chapter_title(5,"Recovery Was Uneven and Not Always Better","Location shaped both recovery speed and affordability pressure."),
+        chapter_title(5, "Who Survived — And What It Cost Them",
+                      "Recovery speed, structural handoff, and the affordability trap."),
         kpi_row([
-            kpi(f"{min_years}-{max_years} years","Recovery range",C["warning"],"Years to return to pre-crisis lending scale"),
-            kpi(str(fast),"Fast-recovery states",C["recovery"],"Recovered in 2 years or less"),
-            kpi(str(slow),"Slow-recovery states",C["crash"],"Took 5 years or longer"),
-            kpi(str(lti_over3),f"Markets above LTI=3 ({latest_msa_year})",C["crash"],"Affordability pressure in recovered areas"),
+            kpi(f"{min_years}–{max_years} yrs", "Recovery range by state", C["warning"],
+                "Years to return to 80% of 2007 volume"),
+            kpi(str(fast), "Fast-recovery states", C["recovery"], "Recovered in ≤2 years"),
+            kpi(str(slow), "Slow-recovery states", C["crash"],    "Took 5+ years"),
+            kpi(f"{nonbank_share_2017:.0%}", "Nonbank share by 2017", C["nonbank"],
+                f"Up from {1 - bank_share_2017 - nonbank_share_2017 + nonbank_share_2017:.0%} — was 30% in 2007"),
         ]),
-        insight_chip(f"So what: Recovery timing spans {spread_years} years between fastest and slowest states in the sample.", C["warning"]),
-        card([
-            G(ch.fig_recovery_map_discrete(df_rvs), "ch5-map"),
-        ]),
-        html.Div(
-            bridge_text,
-            style={"fontSize":"14px","fontWeight":"500","color":C["text"],"margin":"6px 2px 12px"},
+        insight_chip(
+            f"Fast-recovery states hit median LTI {fast_lti:.2f}x by 2017 "
+            f"vs {slow_lti:.2f}x in slow-recovery states — they recovered into unaffordability.",
+            C["crash"],
         ),
-        html.Div(bridge_note, style={"fontSize":"11px","color":C["muted"],"margin":"-6px 2px 10px"}),
-        html.Div([
-            html.Div([
-                card([G(ch.fig_rvs_bar(df_rvs), "rvs")], mb="0px")
-            ], style={"flex":"1","minWidth":"300px"}),
-            html.Div([
-                card([G(ch.fig_lti_affordability(df_msa), "lti-affordability")], mb="0px")
-            ], style={"flex":"1","minWidth":"300px"}),
-        ], style={"display":"flex","gap":"12px","flexWrap":"wrap"}),
+
+        # Chart 1 — RVS choropleth
+        card([
+            html.Div("Where recovery happened — and how fast",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+            G(ch.fig_recovery_map_discrete(df_rvs.merge(df_ra[["state", "median_lti_2017"]], on="state", how="left") if (not df_rvs.empty and not df_ra.empty) else df_rvs), "ch5-map"),
+            ann("Geography determined survival speed. Oil-state and sun-belt markets bounced back in 1–2 years. "
+                "Sand states — Nevada, Arizona, Florida — took 3–7 years.",
+                "RVS = years from trough (2009) to first year originations exceed 80% of 2007 baseline. "
+                "Computed from rvs_full.parquet.",
+                mode),
+            src("HMDA LAR 2007-2017 (CFPB)"),
+        ]),
+
+        # Chart 2 — Bank vs nonbank slope
+        card([
+            html.Div("Who survived — banks handed the market to nonbanks",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+            G(ch.fig_bank_nonbank_slope(df_bn), "ch5-bnslope"),
+            ann("Banks went from 70% to 31% of originations. Nonbanks filled the void — "
+                "but they operate without deposit insurance, without Fed access, and with thinner capital buffers.",
+                "Structural handoff: agency_code=7 (HUD-supervised nonbanks) vs all others. "
+                "Crossover occurs 2013–2014. By 2017 nonbanks originate 2 in every 3 mortgages.",
+                mode),
+            src("HMDA LAR 2007-2017 (CFPB)"),
+        ]),
+
+        # Chart 3 — Recovery vs affordability scatter
+        card([
+            html.Div("The recovery trap — fast recovery, unaffordable outcome",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+            G(ch.fig_recovery_vs_affordability(df_ra), "ch5-recov-afford"),
+            ann("States that recovered fastest — CA, CO, TX — ended up with median LTI above 3x by 2017. "
+                "Recovery and affordability moved in opposite directions.",
+                f"Scatter: RVS years (x) vs median LTI 2017 (y). "
+                f"Fast states (≤2yr): avg LTI {fast_lti:.2f}x. "
+                f"Slow states (≥5yr): avg LTI {slow_lti:.2f}x. n={len(df_ra)} states.",
+                mode),
+            src("HMDA LAR 2007-2017 (CFPB)"),
+        ]),
     ])
 
 def p6(mode):
-    df_dr   = _df_denial_rates()
-    df_ho   = _df_purchase_homeownership()
-    df_race = _df_origination_share_by_race()
+    df_dr = _df_denial_rates()
+    df_ho = _df_purchase_homeownership()
+    df_col = _df_collapse()
 
-    black = df_race[df_race["race"] == "Black / African American"].sort_values("year")
-    b2007 = float(black[black["year"] == 2007]["share"].iloc[0]) if len(black[black["year"] == 2007]) else 0.0
-    b2017 = float(black[black["year"] == 2017]["share"].iloc[0]) if len(black[black["year"] == 2017]) else 0.0
-    black_drop = ((b2017 / b2007) - 1.0) if b2007 else 0.0
-
-    latest_denial_year = int(df_dr["year"].max()) if not df_dr.empty else 2017
-    w_mid = df_dr[(df_dr["year"] == latest_denial_year) & (df_dr["race"] == "White") & (df_dr["income_band"] == "50-80K")]
-    b_mid = df_dr[(df_dr["year"] == latest_denial_year) & (df_dr["race"] == "Black / African American") & (df_dr["income_band"] == "50-80K")]
-    denial_ratio = float(b_mid["denial_rate"].iloc[0] / w_mid["denial_rate"].iloc[0]) if len(w_mid) and len(b_mid) and float(w_mid["denial_rate"].iloc[0]) > 0 else 0.0
-    denial_gap_pp = ((float(b_mid["denial_rate"].iloc[0]) - float(w_mid["denial_rate"].iloc[0])) * 100.0) if len(w_mid) and len(b_mid) else 0.0
-
-    b_mid_series = df_dr[(df_dr["race"] == "Black / African American") & (df_dr["income_band"] == "50-80K")].sort_values("year")
-    post2012 = b_mid_series[b_mid_series["year"] >= 2012]["denial_rate"]
-    base2007 = b_mid_series[b_mid_series["year"] == 2007]["denial_rate"]
-    persistence_pp = ((float(post2012.mean()) - float(base2007.iloc[0])) * 100.0) if len(post2012) and len(base2007) else 0.0
-
+    white_low = df_dr[(df_dr["race"] == "White") & (df_dr["income_band"] == "<50K")].sort_values("year")
+    black_low = df_dr[(df_dr["race"] == "Black / African American") & (df_dr["income_band"] == "<50K")].sort_values("year")
+    post_w = float(white_low[white_low["year"] >= 2012]["denial_rate"].mean()) if not white_low.empty else 0.0
+    post_b = float(black_low[black_low["year"] >= 2012]["denial_rate"].mean()) if not black_low.empty else 0.0
+    gap_pp = (post_b - post_w) * 100.0
+    ratio = (post_b / post_w) if post_w > 0 else 0.0
     h2007 = float(df_ho[df_ho["year"] == 2007]["homeownership_rate"].iloc[0]) if len(df_ho[df_ho["year"] == 2007]) else 0.0
     h2017 = float(df_ho[df_ho["year"] == 2017]["homeownership_rate"].iloc[0]) if len(df_ho[df_ho["year"] == 2017]) else 0.0
 
     return html.Div([
-        chapter_title(6,"Who Got Left Behind","Credit tightened asymmetrically, and inequality in access hardened."),
-        kpi_row([kpi(f"{b2007:.1%} -> {b2017:.1%}", "Black share of originations (2007->2017)", C["crash"], f"{black_drop:.0%} change"),
-                 kpi(f"{denial_ratio:.1f}x", "Denial gap at same income", C["warning"], f"~{denial_gap_pp:.0f} pp higher ({latest_denial_year}, 50-80K)"),
-                 kpi(f"{persistence_pp:+.0f} pp", "Post-2012 denial persistence", C["crash"], "Black 50-80K vs 2007 baseline"),
-                 kpi(f"{h2007:.1f}% -> {h2017:.1f}%", "Homeownership rate (2007->2017)", C["recovery"], "National trend")]),
-        insight_chip(f"So what: At the same income in {latest_denial_year}, denial odds are about {denial_ratio:.1f}x higher for Black applicants.", C["crash"]),
-        card([G(ch.fig_credit_access_index(df_race),"ch6-access-index"),
-              ann("This is not a temporary dip story; it is a relative-access reset that never fully re-equalized.",
-                  "Indexed paths isolate the distributional break: who lost ground and who recovered it.",
-                  mode),
-              src("HMDA LAR 2007-2017 (CFPB)")]),
-        card([G(ch.fig_denial_gap_income(df_dr),"ch6-denial-gap"),
-              ann("Income parity did not buy approval parity. The spread at equal bands points to structural underwriting inequality.",
-                  "Rates use published benchmark years with interpolation for annual continuity.",
-                  mode),
-              src("CFPB Data Point 2014 & 2018","Urban Institute HFPC 2019")]),
-        card([G(ch.fig_denial_persistence(df_dr),"ch6-persistence"),
-              ann("Labor recovery and credit recovery decoupled; employment normalization did not restore lending symmetry.",
-                  "Persistence is tracked in the same middle-income band through the cycle.",
-                  mode)]),
-        html.Div(
-            "Persistently high denial rates meant fewer households could transition into homeownership.",
-            style={"fontSize":"14px","fontWeight":"500","color":C["text"],"margin":"6px 2px 12px"},
-        ),
-        card([G(ch.fig_homeownership_link(df_ho),"ch6-homeownership"),
-              ann("Ownership erosion followed the approval squeeze: fewer accepted borrowers means fewer first-step owners.",
-                  "Shown as temporal linkage rather than single-factor causation.",
-                  mode),
-              src("Census homeownership series","HMDA purchase activity")]),
+        chapter_title(6, "Who Got Left Behind", "The recovery was K-shaped: access improved for some and stayed constrained for others."),
+        kpi_row([
+            kpi(f"{post_b:.0%}", "Post-2012 denial rate (<50K, Black)", C["crash"]),
+            kpi(f"{post_w:.0%}", "Post-2012 denial rate (<50K, White)", C["muted"]),
+            kpi(f"{ratio:.1f}x", "Denial ratio (Black/White)", C["warning"], f"+{gap_pp:.0f} pp gap"),
+            kpi(f"{h2007:.1f}% -> {h2017:.1f}%", "Homeownership rate (2007->2017)", C["recovery"]),
+        ]),
+        insight_chip("Persistently high denial rates meant fewer households could transition into homeownership.", C["crash"]),
+        card([
+            G(ch.fig_ch6_credit_desert(df_dr, income_band="<50K"), "ch6-credit-desert"),
+            ann(
+                "Low-income denial rates remained elevated after 2012, with a persistent racial spread.",
+                "This chart holds income constant and tracks persistence in the post-crisis era.",
+                mode,
+            ),
+            src("CFPB Data Point 2014 & 2018", "Urban Institute HFPC 2019"),
+        ]),
+        card([
+            html.Div("Funnel Leak", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
+            G(ch.fig_ch6_funnel_compare(df_dr, _df_loan_type_share(), 2017), "ch6-sankey"),
+            ann(
+                "Side-by-side funnels make the leak visible: the low-income profile loses far more applicants before origination.",
+                "Conversion rate is shown directly on each funnel to quantify the disparity.",
+                mode,
+            ),
+        ]),
+        card([
+            G(ch.fig_ch6_great_decoupling(df_ho, df_col), "ch6-decoupling"),
+            ann(
+                "Credit conditions recovered faster than ownership outcomes, producing a sustained decoupling.",
+                "Both lines are indexed to 2007=100 to make recovery divergence directly comparable.",
+                mode,
+            ),
+            src("Census homeownership series", "HMDA aggregates"),
+        ]),
     ])
 
 def p7(mode):
     df_lend = _df_lender_bubble()
-    k = dl.exec_kpis()
+    df_race = _df_origination_share_by_race()
     by = df_lend.groupby(["year", "lender_type"], as_index=False)["originations"].sum() if not df_lend.empty else None
     nonbank_2007 = nonbank_2017 = 0.0
     crossover_year = None
@@ -564,51 +599,61 @@ def p7(mode):
         over = piv[piv["Nonbank"] >= piv["Bank"]]
         if not over.empty:
             crossover_year = int(over["year"].min())
+
     nonbank_gain_pp = (nonbank_2017 - nonbank_2007) * 100.0
+    black_2007 = black_2017 = 0.0
+    if not df_race.empty:
+        b07 = df_race[(df_race["year"] == 2007) & (df_race["race"] == "Black / African American")]
+        b17 = df_race[(df_race["year"] == 2017) & (df_race["race"] == "Black / African American")]
+        if len(b07):
+            black_2007 = float(b07["share"].iloc[0])
+        if len(b17):
+            black_2017 = float(b17["share"].iloc[0])
 
     return html.Div([
-        chapter_title(7,"The New Rules: Who Won the Crisis",
-                      "Systemic risk was redistributed, not resolved."),
+        chapter_title(7, "The New Rules: Who Won the Crisis", "Systemic risk was redistributed, not resolved."),
         insight_chip(f"So what: Nonbank share rose {nonbank_gain_pp:+.0f} percentage points from 2007 to 2017.", C["nonbank"]),
-        card([html.Div("Executive summary — 2018",style={"fontSize":"11px","fontWeight":"500",
-                "letterSpacing":"0.07em","textTransform":"uppercase",
-                "color":C["muted"],"marginBottom":"14px"}),
-              kpi_row([kpi(f"{nonbank_2007:.0%} -> {nonbank_2017:.0%}","Nonbank share (2007->2017)",C["nonbank"],"Share of originations"),
-                       kpi(str(crossover_year) if crossover_year else "N/A","Nonbank-bank crossover year",C["warning"]),
-                       kpi(k["fha_peak_share"],f"FHA peak ({k['fha_peak_year']})",C["govt"]),
-                       kpi(str(k["peak_denial_year"]),"Peak denial year",C["crash"])]),
-              data_note(k["wamu_indymac_note"])]),
-        card([html.Div("Structural shift in lending ownership",
-                       style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
-              G(ch.fig_lender_trend(df_lend),"lendtrend")]),
-        card([html.Div("Top lenders: banks vs nonbanks",
-                       style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
-              G(ch.fig_top_lenders_split(df_lend),"toplenders"),
-              ann("Market power rotated: the center of gravity shifted from deposit-funded banks to fee-driven nonbanks.",
-                  "The top-lender mix shows a structural ownership change, not a cyclical blip.",
-                  mode)]),
+        kpi_row([
+            kpi(f"{nonbank_2007:.0%} -> {nonbank_2017:.0%}", "Nonbank share (2007->2017)", C["nonbank"]),
+            kpi(str(crossover_year) if crossover_year else "N/A", "First nonbank>=bank year", C["warning"]),
+            kpi(f"{black_2007:.1%} -> {black_2017:.1%}", "Black origination share", C["crash"], "Participation share"),
+        ]),
+        card([
+            html.Div("The Great Handover: banks to shadow banks", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
+            G(ch.fig_ch7_handover_race(df_lend), "ch7-handover"),
+            ann(
+                "Watch the handover: banks dominate in 2007, then nonbanks overtake through the post-crisis rule regime.",
+                "This is institutional redistribution of market power, not a neutral recovery.",
+                mode,
+            ),
+        ]),
+        card([
+            html.Div("Winners vs Losers: who gained power, who lost access", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
+            G(ch.fig_ch7_winners_losers_matrix(df_lend, df_race), "ch7-shift-matrix"),
+            ann(
+                "Upper-right points are winners: share and participation both rose. Lower-left points are groups left behind.",
+                "In this sample, nonbanks moved into the winner quadrant while Black borrower participation moved the other way.",
+                mode,
+            ),
+        ]),
         html.Div([
             html.P([
-                html.Span("The subprime crisis ",style={"fontWeight":"500"}),
+                html.Span("The subprime crisis ", style={"fontWeight": "500"}),
                 "wasn't caused by subprime borrowers.  ",
-                html.Span("The recovery ",style={"fontWeight":"500"}),
+                html.Span("The recovery ", style={"fontWeight": "500"}),
                 "didn't restore the people it was supposed to help.  ",
-                html.Span("The risk ",style={"fontWeight":"500"}),
+                html.Span("The risk ", style={"fontWeight": "500"}),
                 "didn't disappear. It migrated into a less-visible part of the system.",
-            ], style={"fontSize":"16px","color":C["text"],"lineHeight":"1.8",
-                      "textAlign":"center","maxWidth":"700px","margin":"0 auto",
-                      "fontStyle":"italic"})
-        ], style={"padding":"28px","borderRadius":"12px","marginBottom":"16px",
-                  "background":C["surface"],"border":f"0.5px solid {C['border']}"}),
+            ], style={"fontSize": "16px", "color": C["text"], "lineHeight": "1.8", "textAlign": "center", "maxWidth": "700px", "margin": "0 auto", "fontStyle": "italic"})
+        ], style={"padding": "28px", "borderRadius": "12px", "marginBottom": "16px", "background": C["surface"], "border": f"0.5px solid {C['border']}"}),
     ])
-
-# ── Layout ─────────────────────────────────────────────
+# â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.layout = html.Div([
     dcc.Location(id="url",refresh=False),
     html.Link(
         rel="stylesheet",
-        href="https://fonts.googleapis.com/css2?family=Merriweather:wght@500;700&family=Source+Sans+3:wght@400;500;600;700&display=swap",
+        href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Source+Sans+3:wght@400;500;600;700&display=swap",
     ),
     html.Div(id="nav", children=navbar(1)),
     html.Div(id="page",style={
@@ -617,30 +662,40 @@ app.layout = html.Div([
     }),
 ], style={"background":C["surface"],"minHeight":"100vh"})
 
-# ── Callbacks ──────────────────────────────────────────
+# â”€â”€ Callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 PAGE_MAP = {
     "/chapter/1":(p1,1),"/chapter/2":(p2,2),"/chapter/3":(p3,3),
     "/chapter/4":(p4,4),"/chapter/5":(p5,5),"/chapter/6":(p6,6),"/chapter/7":(p7,7),
 }
 
-@lru_cache(maxsize=16)
 def _render_page(path: str, mode: str):
     fn, _ = PAGE_MAP.get(path,(p1,1))
     return fn(mode or "civilian")
 
 @app.callback(Output("page","children"), Input("url","pathname"), Input("mode","value"))
 def route(path, mode):
-    return _render_page(path or "/chapter/1", mode or "civilian")
+    try:
+        return _render_page(path or "/chapter/1", mode or "civilian")
+    except Exception:
+        err = traceback.format_exc(limit=8)
+        print(err)
+        return card([
+            html.Div("Render error", style={"fontSize":"14px","fontWeight":"600","marginBottom":"8px","color":C["crash"]}),
+            html.Pre(err, style={"whiteSpace":"pre-wrap","fontSize":"11px","color":C["text"],"margin":"0"}),
+        ], pad="18px 20px")
 
 @app.callback(Output("nav","children"), Input("url","pathname"))
 def render_nav(path):
     _, num = PAGE_MAP.get(path, (p1, 1))
     return navbar(num)
 
+
 if __name__ == "__main__":
     print(f"Mode: {'REAL' if dl.USE_REAL_DATA else 'MOCK'} DATA")
     print("Open: http://127.0.0.1:8050")
-    app.run(debug=True, port=8050)
+    app.run(debug=False, port=8050)
+
+
 
 

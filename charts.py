@@ -18,30 +18,32 @@ Usage:
 
 import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
+from plotly.subplots import make_subplots
 
 # ─────────────────────────────────────────────────────────
 # DESIGN TOKENS  — single source of truth for all charts
 # ─────────────────────────────────────────────────────────
 C = {
     "bg":          "rgba(0,0,0,0)",   # transparent — host provides bg
-    "grid":        "rgba(26,26,26,0.12)",
-    "border":      "rgba(26,26,26,0.22)",
+    "grid":        "rgba(26,26,26,0.10)",
+    "border":      "rgba(26,26,26,0.20)",
     "text":        "#1A1A1A",
     "muted":       "#5A5A5A",
-    "surface":     "#F1F3F2",
+    "surface":     "#EFEDE7",
 
     # Semantic
-    "crash":       "#D7261E",
+    "crash":       "#E3120B",
     "recovery":    "#2C7A5A",
-    "govt":        "#285C9A",
+    "govt":        "#006BA2",
     "conventional":"#767676",
     "warning":     "#A6761D",
-    "purchase":    "#285C9A",
+    "purchase":    "#006BA2",
     "refi":        "#3D8B6D",
     "bank":        "#767676",
     "nonbank":     "#A84A34",
     "veteran":     "#4F4B7A",
-    "fha":         "#285C9A",
+    "fha":         "#006BA2",
     "va":          "#3D8B6D",
     "fsa":         "#84BDAA",
 
@@ -49,11 +51,11 @@ C = {
     "white":       "#767676",
     "black":       "#D7261E",
     "hispanic":    "#A6761D",
-    "asian":       "#285C9A",
+    "asian":       "#006BA2",
 }
 
 FONT  = "'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-FONT_SERIF = "'Merriweather', Georgia, 'Times New Roman', serif"
+FONT_SERIF = "'Libre Baskerville', Georgia, 'Times New Roman', serif"
 H     = 380   # default chart height
 H_SM  = 240   # small chart height
 H_LG  = 440   # large chart height
@@ -80,10 +82,11 @@ def _base_layout(height=H, margin=None, **kwargs):
         paper_bgcolor=C["bg"],
         plot_bgcolor=C["bg"],
         uirevision="keep",
-        transition=dict(duration=120, easing="linear"),
+        transition=dict(duration=90, easing="linear"),
         font=dict(family=FONT, size=12, color=C["text"]),
         title=dict(font=dict(family=FONT_SERIF, size=14, color=C["text"]), x=0, xanchor="left"),
         hoverlabel=dict(font=dict(family=FONT, size=11), bgcolor="rgba(255,255,255,0.97)", bordercolor=C["border"]),
+        colorway=["#006BA2", "#E3120B", "#379A8B", "#A6761D", "#7A7A7A", "#3EBCD2"],
         legend=dict(
             orientation="h",
             yanchor="bottom", y=1.03,
@@ -378,6 +381,178 @@ def fig_lti_by_income_band(df: pd.DataFrame) -> go.Figure:
 # ─────────────────────────────────────────────────────────
 # CHAPTER 5 — RECOVERY MAP
 # ─────────────────────────────────────────────────────────
+
+def fig_bank_nonbank_slope(df: pd.DataFrame) -> go.Figure:
+    """
+    Slope chart: Bank vs Nonbank origination share 2007 → 2017.
+    Two lines crossing — the structural handoff visible as a single motion.
+    Banks: 70% → 31%. Nonbanks: 30% → 69%.
+    """
+    bank    = df[df["lender_type"] == "Bank"].sort_values("year")
+    nonbank = df[df["lender_type"] == "Nonbank"].sort_values("year")
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=bank["year"], y=bank["share"],
+        name="Banks",
+        mode="lines+markers",
+        line=dict(color=C["conventional"], width=2.5),
+        marker=dict(size=6),
+        hovertemplate="Banks %{x}: %{y:.1%}<extra></extra>",
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=nonbank["year"], y=nonbank["share"],
+        name="Nonbanks",
+        mode="lines+markers",
+        line=dict(color=C["nonbank"], width=2.5),
+        marker=dict(size=6),
+        hovertemplate="Nonbanks %{x}: %{y:.1%}<extra></extra>",
+    ))
+
+    # Mark the crossover
+    cross_year = None
+    for i in range(len(bank) - 1):
+        b0 = float(bank["share"].iloc[i])
+        b1 = float(bank["share"].iloc[i + 1])
+        n0 = float(nonbank["share"].iloc[i])
+        n1 = float(nonbank["share"].iloc[i + 1])
+        if (b0 > n0) != (b1 > n1):
+            cross_year = int(bank["year"].iloc[i])
+            break
+
+    if cross_year:
+        fig.add_vline(
+            x=cross_year + 0.5,
+            line=dict(color=C["crash"], width=1.2, dash="dash"),
+        )
+        fig.add_annotation(
+            x=cross_year + 0.6, y=0.52,
+            text="Crossover<br>Banks lose majority",
+            showarrow=False,
+            font=dict(size=9, color=C["crash"]),
+            xanchor="left",
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+        )
+
+    # 2007 and 2017 endpoint labels
+    b2007 = float(bank[bank["year"] == 2007]["share"].iloc[0]) if len(bank[bank["year"] == 2007]) else 0
+    b2017 = float(bank[bank["year"] == 2017]["share"].iloc[0]) if len(bank[bank["year"] == 2017]) else 0
+    n2007 = float(nonbank[nonbank["year"] == 2007]["share"].iloc[0]) if len(nonbank[nonbank["year"] == 2007]) else 0
+    n2017 = float(nonbank[nonbank["year"] == 2017]["share"].iloc[0]) if len(nonbank[nonbank["year"] == 2017]) else 0
+
+    for x, y, txt, color in [
+        (2007, b2007, f"{b2007:.0%}", C["conventional"]),
+        (2017, b2017, f"{b2017:.0%}", C["conventional"]),
+        (2007, n2007, f"{n2007:.0%}", C["nonbank"]),
+        (2017, n2017, f"{n2017:.0%}", C["nonbank"]),
+    ]:
+        fig.add_annotation(
+            x=x, y=y,
+            text=txt,
+            showarrow=False,
+            font=dict(size=10, color=color, weight=600),
+            xanchor="right" if x == 2007 else "left",
+            xshift=-8 if x == 2007 else 8,
+        )
+
+    fig.update_layout(**_base_layout(
+        height=H,
+        margin=dict(l=48, r=48, t=48, b=44),
+        title=dict(
+            text="Who survived — banks handed the market to nonbanks",
+            font=dict(size=13, weight=500), x=0, xanchor="left",
+        ),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=2, tickcolor=C["border"]),
+        yaxis=dict(
+            gridcolor=C["grid"], zeroline=False,
+            tickformat=".0%", title="Share of originations",
+            range=[0.2, 0.85],
+        ),
+    ))
+    return fig
+
+
+def fig_recovery_vs_affordability(df: pd.DataFrame) -> go.Figure:
+    """
+    Scatter: recovery speed (rvs_years) vs median LTI in 2017.
+    Fast recovery states became unaffordable — the recovery trap.
+    One point per state, labelled.
+    """
+    fig = go.Figure()
+
+    if df.empty:
+        return fig
+
+    colors = [C["recovery"] if r <= 2 else C["warning"] if r <= 4 else C["crash"]
+              for r in df["rvs_years"]]
+
+    fig.add_trace(go.Scatter(
+        x=df["rvs_years"],
+        y=df["median_lti_2017"],
+        mode="markers+text",
+        marker=dict(size=12, color=colors, opacity=0.85,
+                    line=dict(color="white", width=1.5)),
+        text=df["state"],
+        textposition="top center",
+        textfont=dict(size=9),
+        hovertemplate=(
+            "<b>%{text}</b><br>"
+            "Recovery: %{x} years<br>"
+            "2017 median LTI: %{y:.2f}x"
+            "<extra></extra>"
+        ),
+    ))
+
+    # 3x affordability line
+    fig.add_hline(
+        y=3.0,
+        line=dict(color=C["crash"], width=1, dash="dot"),
+        annotation_text="LTI = 3× (affordability threshold)",
+        annotation_position="right",
+        annotation_font=dict(size=9, color=C["crash"]),
+    )
+
+    # Quadrant label
+    fig.add_annotation(
+        x=1.2, y=3.4,
+        text="Fast recovery<br>→ unaffordable",
+        showarrow=False,
+        font=dict(size=9, color=C["crash"]),
+        bgcolor="rgba(255,240,240,0.85)",
+        bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+    )
+    fig.add_annotation(
+        x=6.5, y=2.2,
+        text="Slow recovery<br>→ affordable",
+        showarrow=False,
+        font=dict(size=9, color=C["recovery"]),
+        bgcolor="rgba(240,255,245,0.85)",
+        bordercolor=C["recovery"], borderwidth=0.5, borderpad=3,
+    )
+
+    fig.update_layout(**_base_layout(
+        height=H,
+        margin=dict(l=48, r=100, t=48, b=48),
+        title=dict(
+            text="The recovery trap — fast recovery, unaffordable outcome",
+            font=dict(size=13, weight=500), x=0, xanchor="left",
+        ),
+        xaxis=dict(
+            showgrid=True, gridcolor=C["grid"], zeroline=False,
+            title="Years to recover to 80% of 2007 volume",
+            tickcolor=C["border"], dtick=1,
+        ),
+        yaxis=dict(
+            gridcolor=C["grid"], zeroline=False,
+            title="Median loan / income ratio (2017)",
+        ),
+        showlegend=False,
+    ))
+    return fig
+
 
 def fig_rvs_bar(df: pd.DataFrame) -> go.Figure:
     """
@@ -1462,6 +1637,596 @@ def fig_homeownership_link(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def fig_ch6_credit_desert(df: pd.DataFrame, income_band: str = "<50K") -> go.Figure:
+    """Chapter 6: low-income denial persistence with post-2012 focus."""
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    d = df[df["income_band"] == income_band].copy().sort_values("year")
+    if d.empty:
+        return fig
+
+    for race, color in [("White", C["white"]), ("Black / African American", C["black"])]:
+        s = d[d["race"] == race]
+        if s.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=s["year"], y=s["denial_rate"],
+            mode="lines+markers",
+            name=race,
+            line=dict(color=color, width=2.8 if "Black" in race else 2.0, shape="spline", smoothing=0.65),
+            marker=dict(size=5),
+            hovertemplate=f"{race}<br>%{{x}}: %{{y:.1%}}<extra></extra>",
+        ))
+
+    b = d[d["race"] == "Black / African American"]
+    if not b.empty and (b["year"] == 2010).any():
+        p = b[b["year"] == 2010].iloc[0]
+        fig.add_annotation(
+            x=2010, y=float(p["denial_rate"]),
+            text="2010: Peak of No",
+            showarrow=True, arrowhead=2, ax=30, ay=-35,
+            font=dict(size=10, color=C["crash"]),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor=C["crash"], borderwidth=0.6, borderpad=3,
+        )
+
+    fig.add_vrect(
+        x0=2012, x1=float(d["year"].max()) + 0.2,
+        fillcolor="rgba(215,38,30,0.07)",
+        line_width=0,
+    )
+    fig.add_annotation(
+        x=2012.1, y=0.95, xref="x", yref="paper",
+        text="Post-2012: denial gap persists",
+        showarrow=False, xanchor="left",
+        font=dict(size=10, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+    )
+
+    w = d[d["race"] == "White"]
+    if not b.empty and not w.empty:
+        pre_b = float(b[b["year"] <= 2011]["denial_rate"].mean()) if len(b[b["year"] <= 2011]) else np.nan
+        pre_w = float(w[w["year"] <= 2011]["denial_rate"].mean()) if len(w[w["year"] <= 2011]) else np.nan
+        post_b = float(b[b["year"] >= 2012]["denial_rate"].mean()) if len(b[b["year"] >= 2012]) else np.nan
+        post_w = float(w[w["year"] >= 2012]["denial_rate"].mean()) if len(w[w["year"] >= 2012]) else np.nan
+        if pre_w and post_w and pre_w > 0 and post_w > 0:
+            rel_pre = (pre_b - pre_w) / pre_w
+            rel_post = (post_b - post_w) / post_w
+            trend = "widened" if rel_post > rel_pre else "narrowed"
+            fig.add_annotation(
+                x=0.98, y=0.06, xref="paper", yref="paper",
+                text=f"Double delta: rates fell for both groups, but relative gap {trend} after 2012.",
+                showarrow=False, xanchor="right",
+                font=dict(size=9, color=C["muted"]),
+                bgcolor="rgba(255,255,255,0.92)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
+            )
+        post_b_lvl = float(b[b["year"] >= 2012]["denial_rate"].mean()) if len(b[b["year"] >= 2012]) else np.nan
+        pre_w_lvl = float(w[w["year"] <= 2008]["denial_rate"].mean()) if len(w[w["year"] <= 2008]) else np.nan
+        if post_b_lvl == post_b_lvl and pre_w_lvl == pre_w_lvl:
+            fig.add_annotation(
+                x=0.02, y=0.88, xref="paper", yref="paper",
+                text=f"Persistence: post-2012 Black denial {post_b_lvl:.0%} > pre-crisis White ~{pre_w_lvl:.0%}.",
+                showarrow=False, xanchor="left",
+                font=dict(size=9, color=C["crash"]),
+                bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+            )
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 80,
+        margin=dict(l=52, r=24, t=38, b=50),
+        title=dict(text='The Stickiness of the "No": Persistent Racial Barriers in Lending', font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"]),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickformat=".0%", title="Denial Rate (%)"),
+        legend=dict(
+            x=0.98, y=0.98, xanchor="right", yanchor="top",
+            bgcolor="rgba(255,255,255,0.85)", bordercolor=C["border"], borderwidth=0.5,
+        ),
+    ))
+    return fig
+
+
+def fig_ch7_shadow_bump(df: pd.DataFrame, top_n: int = 10) -> go.Figure:
+    """Chapter 7: top-lender rank trajectories with highlight/mute styling."""
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    d = (
+        df.groupby(["year", "institution", "lender_type"], as_index=False)["originations"]
+        .sum()
+        .dropna(subset=["year", "institution", "originations"])
+    )
+    if d.empty:
+        return fig
+    d = d.sort_values(["year", "originations"], ascending=[True, False])
+    d["rank"] = d.groupby("year")["originations"].rank(method="first", ascending=False).astype(int)
+    d = d[d["rank"] <= top_n].copy()
+    if d.empty:
+        return fig
+
+    keep = d.groupby("institution")["year"].nunique().sort_values(ascending=False).head(top_n).index
+    d = d[d["institution"].isin(keep)].copy()
+
+    highlight_terms = ["rocket", "quicken", "loandepot", "united wholesale", "uwm"]
+    bank_terms = ["wells fargo", "chase", "jpmorgan", "bank of america", "bofa", "citibank", "citi"]
+
+    for inst, sub in d.groupby("institution"):
+        inst_l = str(inst).lower()
+        lt = str(sub["lender_type"].mode().iloc[0]) if "lender_type" in sub.columns and len(sub["lender_type"]) else "Bank"
+        is_highlight = any(t in inst_l for t in highlight_terms)
+        is_big_bank = any(t in inst_l for t in bank_terms)
+        if is_highlight:
+            color, width, op = C["nonbank"], 3.8, 0.95
+        elif is_big_bank:
+            color, width, op = "#8F949A", 2.2, 0.8
+        else:
+            color, width, op = ("#C5C9CE" if lt == "Bank" else "#D7B2A8"), 1.2, 0.4
+        fig.add_trace(go.Scatter(
+            x=sub["year"], y=sub["rank"],
+            mode="lines+markers",
+            name=inst,
+            line=dict(color=color, width=width, shape="spline", smoothing=0.55),
+            marker=dict(size=4 if not is_highlight else 6),
+            opacity=op,
+            customdata=np.c_[sub["originations"], sub["lender_type"]],
+            hovertemplate="<b>%{fullData.name}</b><br>Year: %{x}<br>Rank: %{y}<br>Originations: %{customdata[0]:,.0f}<br>Type: %{customdata[1]}<extra></extra>",
+            showlegend=False,
+        ))
+
+    latest = int(d["year"].max())
+    labels = d[d["year"] == latest].sort_values("rank")
+    fig.add_trace(go.Scatter(
+        x=labels["year"] + 0.12,
+        y=labels["rank"],
+        mode="text",
+        text=labels["institution"],
+        textposition="middle left",
+        textfont=dict(size=9, color=C["text"]),
+        hoverinfo="skip",
+        showlegend=False,
+    ))
+
+    fig.update_layout(**_base_layout(
+        height=H_LG,
+        margin=dict(l=54, r=170, t=40, b=52),
+        title=dict(text="The Great Decoupling: Markets Recovered, People Didn't", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year"),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, autorange="reversed", dtick=1, title="Rank (1 = largest)"),
+    ))
+    return fig
+
+
+def fig_ch7_concentration_shift(df: pd.DataFrame) -> go.Figure:
+    """Chapter 7: 100% stacked area for bank vs nonbank with HHI stat callout."""
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    by_type = df.groupby(["year", "lender_type"], as_index=False)["originations"].sum()
+    piv = by_type.pivot(index="year", columns="lender_type", values="originations").fillna(0)
+    if "Bank" not in piv.columns:
+        piv["Bank"] = 0
+    if "Nonbank" not in piv.columns:
+        piv["Nonbank"] = 0
+    piv = piv.reset_index().sort_values("year")
+    total = (piv["Bank"] + piv["Nonbank"]).replace(0, np.nan)
+    piv["nonbank_share"] = piv["Nonbank"] / total
+
+    by_inst = df.groupby(["year", "institution"], as_index=False)["originations"].sum()
+    by_inst["total"] = by_inst.groupby("year")["originations"].transform("sum")
+    by_inst = by_inst[by_inst["total"] > 0].copy()
+    by_inst["s"] = by_inst["originations"] / by_inst["total"]
+    hhi = by_inst.groupby("year", as_index=False).apply(lambda g: (g["s"] ** 2).sum(), include_groups=False)
+    hhi.columns = ["year", "hhi"]
+    if not hhi.empty:
+        hhi["hhi_idx"] = (hhi["hhi"] / hhi["hhi"].iloc[0]) * 100.0 if hhi["hhi"].iloc[0] else np.nan
+
+    fig.add_trace(go.Scatter(
+        x=piv["year"], y=(1 - piv["nonbank_share"]),
+        mode="lines",
+        name="Bank share",
+        line=dict(color="#23364D", width=2.2, shape="spline", smoothing=0.6),
+        stackgroup="one", groupnorm="fraction", fill="tozeroy",
+        hovertemplate="Bank share<br>%{x}: %{y:.1%}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=piv["year"], y=piv["nonbank_share"],
+        mode="lines",
+        name="Nonbank share",
+        line=dict(color=C["nonbank"], width=3.4, shape="spline", smoothing=0.6),
+        stackgroup="one", groupnorm="fraction", fill="tonexty",
+        hovertemplate="Nonbank share<br>%{x}: %{y:.1%}<extra></extra>",
+    ))
+
+    if not hhi.empty:
+        hhi = hhi.sort_values("year")
+        h2013 = float(hhi[hhi["year"] == 2013]["hhi"].iloc[0]) if len(hhi[hhi["year"] == 2013]) else float(hhi["hhi"].iloc[0])
+        hlast = float(hhi["hhi"].iloc[-1]) if len(hhi) else h2013
+        up = ((hlast / h2013) - 1.0) * 100.0 if h2013 else 0.0
+        fig.add_annotation(
+            x=0.98, y=0.95, xref="paper", yref="paper",
+            text=f"Market concentration: {'up' if up >= 0 else 'down'} {abs(up):.0f}% since 2013",
+            showarrow=False, xanchor="right", yanchor="top",
+            font=dict(size=10, color=C["crash"] if up >= 0 else C["recovery"]),
+            bgcolor="rgba(255,255,255,0.94)", bordercolor=C["border"], borderwidth=0.6, borderpad=4,
+        )
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 90,
+        margin=dict(l=54, r=24, t=40, b=52),
+        title=dict(text="", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year"),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickformat=".0%", title="Share of originations", range=[0, 1]),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+def fig_ch7_winners_losers_matrix(df_lender: pd.DataFrame, df_race_share: pd.DataFrame) -> go.Figure:
+    """Chapter 7: winners-vs-losers shift matrix (2007 -> 2017)."""
+    fig = go.Figure()
+    if (df_lender is None or df_lender.empty) and (df_race_share is None or df_race_share.empty):
+        return fig
+
+    rows = []
+
+    if df_lender is not None and not df_lender.empty:
+        d = df_lender[df_lender["year"].isin([2007, 2017])].copy()
+        g = d.groupby(["year", "lender_type"], as_index=False)["originations"].sum()
+        totals = g.groupby("year", as_index=False)["originations"].sum().rename(columns={"originations": "year_total"})
+        g = g.merge(totals, on="year", how="left")
+        g["share"] = np.where(g["year_total"] > 0, g["originations"] / g["year_total"], 0.0)
+
+        for typ in ["Bank", "Nonbank"]:
+            r07 = g[(g["year"] == 2007) & (g["lender_type"] == typ)]
+            r17 = g[(g["year"] == 2017) & (g["lender_type"] == typ)]
+            if r07.empty or r17.empty:
+                continue
+            s07 = float(r07["share"].iloc[0])
+            s17 = float(r17["share"].iloc[0])
+            o07 = float(r07["originations"].iloc[0])
+            o17 = float(r17["originations"].iloc[0])
+            raw_participation = ((o17 / o07) - 1.0) * 100.0 if o07 > 0 else 0.0
+            rows.append({
+                "group": "Institutions",
+                "entity": "Big Banks" if typ == "Bank" else "Nonbanks",
+                "delta_share_pp": (s17 - s07) * 100.0,
+                "delta_participation_pp": raw_participation,
+                "size_2017": o17,
+            })
+
+    if df_race_share is not None and not df_race_share.empty:
+        r = df_race_share[df_race_share["year"].isin([2007, 2017])].copy()
+        for race in ["White", "Black / African American", "Asian"]:
+            r07 = r[(r["year"] == 2007) & (r["race"] == race)]
+            r17 = r[(r["year"] == 2017) & (r["race"] == race)]
+            if r07.empty or r17.empty:
+                continue
+            s07 = float(r07["share"].iloc[0])
+            s17 = float(r17["share"].iloc[0])
+            c07 = float(r07["count"].iloc[0])
+            c17 = float(r17["count"].iloc[0])
+            raw_participation = ((c17 / c07) - 1.0) * 100.0 if c07 > 0 else 0.0
+            rows.append({
+                "group": "Borrowers",
+                "entity": "Black households" if race.startswith("Black") else f"{race} households",
+                "delta_share_pp": (s17 - s07) * 100.0,
+                "delta_participation_pp": raw_participation,
+                "size_2017": c17,
+            })
+
+    m = pd.DataFrame(rows)
+    if m.empty:
+        return fig
+
+    m["size_plot"] = np.sqrt(np.maximum(m["size_2017"], 1.0))
+    m["size_plot"] = 18 + 38 * (m["size_plot"] - m["size_plot"].min()) / (m["size_plot"].max() - m["size_plot"].min() + 1e-9)
+    m["delta_participation_scaled"] = np.sign(m["delta_participation_pp"]) * np.log1p(np.abs(m["delta_participation_pp"]))
+
+    # Consistent color: Success Green = Nonbanks + Asian; Crisis Red = Big Banks + Black; Neutral = White
+    SUCCESS_GREEN = "#2E8B57"
+    CRISIS_RED    = "#C23B31"
+    NEUTRAL_GREY  = "#7A7A7A"
+    COLOR_MAP = {
+        "Nonbanks":          SUCCESS_GREEN,
+        "Big Banks":         CRISIS_RED,
+        "Asian households":  SUCCESS_GREEN,
+        "Black households":  CRISIS_RED,
+        "White households":  NEUTRAL_GREY,
+    }
+    m["color"] = m["entity"].map(COLOR_MAP).fillna(NEUTRAL_GREY)
+
+    # --- Quadrant shading (Winners top-right, Losers bottom-left) ---
+    BIG = 9999
+    fig.add_shape(type="rect",
+        x0=0, x1=BIG, y0=0, y1=BIG, xref="x", yref="y",
+        fillcolor="rgba(46,139,87,0.07)", line=dict(width=0), layer="below")
+    fig.add_shape(type="rect",
+        x0=-BIG, x1=0, y0=-BIG, y1=0, xref="x", yref="y",
+        fillcolor="rgba(199,37,42,0.07)", line=dict(width=0), layer="below")
+
+    # Quadrant corner labels
+    fig.add_annotation(x=0.97, y=0.97, xref="paper", yref="paper",
+        text="<b>WINNERS</b>", showarrow=False, xanchor="right", yanchor="top",
+        font=dict(size=11, color=SUCCESS_GREEN), opacity=0.55)
+    fig.add_annotation(x=0.03, y=0.03, xref="paper", yref="paper",
+        text="<b>LOSERS</b>", showarrow=False, xanchor="left", yanchor="bottom",
+        font=dict(size=11, color=CRISIS_RED), opacity=0.55)
+
+    # --- Nonbanks glow effect (wider, transparent circle underneath) ---
+    nonb_glow = m[m["entity"] == "Nonbanks"]
+    if not nonb_glow.empty:
+        fig.add_trace(go.Scatter(
+            x=nonb_glow["delta_share_pp"],
+            y=nonb_glow["delta_participation_scaled"],
+            mode="markers",
+            showlegend=False,
+            marker=dict(
+                size=nonb_glow["size_plot"] * 2.2,
+                color=SUCCESS_GREEN,
+                opacity=0.12,
+                symbol="circle",
+                line=dict(width=0),
+            ),
+            hoverinfo="skip",
+        ))
+
+    # --- Main scatter traces ---
+    for grp, sym in [("Institutions", "circle"), ("Borrowers", "diamond")]:
+        d = m[m["group"] == grp]
+        if d.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=d["delta_share_pp"],
+            y=d["delta_participation_scaled"],
+            mode="markers",
+            name=grp,
+            marker=dict(
+                size=d["size_plot"],
+                symbol=sym,
+                color=d["color"],
+                line=dict(width=1.2, color="rgba(17,24,39,0.30)"),
+                opacity=0.93,
+            ),
+            customdata=np.stack([d["entity"], d["size_2017"], d["delta_participation_pp"]], axis=1),
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "Market Control shift: %{x:+.1f} pp<br>"
+                "Systemic Access shift: %{customdata[2]:+.1f}%<br>"
+                "2017 volume: %{customdata[1]:,.0f}<extra></extra>"
+            ),
+        ))
+
+    # Zero axis lines
+    fig.add_hline(y=0, line_width=1.2, line_dash="dot", line_color="rgba(17,24,39,0.25)")
+    fig.add_vline(x=0, line_width=1.2, line_dash="dot", line_color="rgba(17,24,39,0.25)")
+
+    # --- Leader-line annotations for every entity ---
+    # Each gets an arrow pulling label clear of the bubble
+    label_offsets = {
+        "Nonbanks":          (80,  -50),
+        "Big Banks":         (-90,  50),
+        "Asian households":  (75,  -40),
+        "Black households":  (-90,  55),
+        "White households":  (70,   40),
+    }
+    label_colors = {
+        "Nonbanks":          SUCCESS_GREEN,
+        "Big Banks":         CRISIS_RED,
+        "Asian households":  SUCCESS_GREEN,
+        "Black households":  CRISIS_RED,
+        "White households":  NEUTRAL_GREY,
+    }
+    for _, row in m.iterrows():
+        entity = str(row["entity"])
+        ax_, ay_ = label_offsets.get(entity, (60, -40))
+        lc = label_colors.get(entity, C["text"])
+        fig.add_annotation(
+            x=float(row["delta_share_pp"]),
+            y=float(row["delta_participation_scaled"]),
+            xref="x", yref="y",
+            text=f"<b>{entity}</b>",
+            showarrow=True, arrowhead=2, arrowwidth=1.2,
+            arrowcolor=lc, ax=ax_, ay=ay_,
+            font=dict(size=10, color=lc),
+            bgcolor="rgba(255,255,255,0.95)",
+            bordercolor=lc, borderwidth=0.8, borderpad=3,
+        )
+
+    # "So What?" corner note
+    fig.add_annotation(
+        x=0.01, y=0.03, xref="paper", yref="paper",
+        text="The recovery was an institutional success — but a demographic tragedy",
+        showarrow=False, xanchor="left",
+        font=dict(size=10, color=C["muted"], style="italic"),
+        bgcolor="rgba(255,255,255,0.90)", bordercolor=C["border"], borderwidth=0.6, borderpad=5,
+    )
+
+    y_tick_raw = [-60, -40, -20, 0, 20, 50, 100, 200, 400]
+    y_tick_vals = [float(np.sign(v) * np.log1p(abs(v))) for v in y_tick_raw]
+    y_tick_text = [f"{v:+.0f}%" if v != 0 else "0%" for v in y_tick_raw]
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 140,
+        margin=dict(l=70, r=36, t=52, b=62),
+        title=dict(
+            text="The Structural Divide: Who Gained Power, Who Lost Access",
+            font=dict(size=13), x=0, xanchor="left",
+        ),
+        xaxis=dict(
+            showgrid=True, gridcolor=C["grid"], zeroline=False,
+            title="Market Control (Gained →)",
+            tickformat="+.0f",
+            ticksuffix=" pp",
+        ),
+        yaxis=dict(
+            showgrid=True, gridcolor=C["grid"], zeroline=False,
+            title="Systemic Access (Gained ↑)",
+            tickmode="array",
+            tickvals=y_tick_vals,
+            ticktext=y_tick_text,
+        ),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+def fig_ch6_funnel_leak(df_denial: pd.DataFrame, df_loan: pd.DataFrame, profile: str, year: int = 2017) -> go.Figure:
+    """Chapter 6: applications->approved/denied->loan-type funnel for selected borrower profile."""
+    fig = go.Figure()
+    if df_denial is None or df_denial.empty or df_loan is None or df_loan.empty:
+        return fig
+
+    try:
+        race, band = profile.split("|", 1)
+    except ValueError:
+        race, band = "White", "100-150K"
+
+    den = df_denial[(df_denial["year"] == year) & (df_denial["race"] == race) & (df_denial["income_band"] == band)]
+    if den.empty:
+        return fig
+    denial_rate = float(den["denial_rate"].iloc[0])
+    applications = 10000.0
+    denied = applications * denial_rate
+    approved = applications - denied
+
+    lt = df_loan[df_loan["year"] == year].copy()
+    if lt.empty:
+        return fig
+    lt = lt.groupby("loan_type", as_index=False)["share"].sum()
+    lt = lt[lt["loan_type"].isin(["Conventional", "FHA", "VA", "FSA/RHS"])].copy()
+    if lt.empty:
+        return fig
+    lt["share_norm"] = lt["share"] / lt["share"].sum()
+    lt["approved_flow"] = approved * lt["share_norm"]
+
+    nodes = [f"Applications\n{race}, {band}", "Approved", "Denied"] + lt["loan_type"].tolist()
+    source = [0, 0] + [1] * len(lt)
+    target = [1, 2] + list(range(3, 3 + len(lt)))
+    value = [approved, denied] + lt["approved_flow"].tolist()
+
+    color_map = {
+        "Conventional": C["conventional"],
+        "FHA": C["fha"],
+        "VA": C["va"],
+        "FSA/RHS": C["fsa"],
+    }
+    node_colors = [C["muted"], C["recovery"], C["crash"]] + [color_map.get(t, C["muted"]) for t in lt["loan_type"]]
+
+    fig.add_trace(go.Sankey(
+        arrangement="snap",
+        node=dict(
+            label=nodes,
+            color=node_colors,
+            pad=18,
+            thickness=16,
+            line=dict(color="rgba(255,255,255,0.85)", width=0.8),
+        ),
+        link=dict(
+            source=source,
+            target=target,
+            value=value,
+            color=["rgba(44,122,90,0.45)", "rgba(215,38,30,0.45)"] + ["rgba(40,92,154,0.25)"] * len(lt),
+            hovertemplate="%{source.label} -> %{target.label}<br>Flow: %{value:,.0f}<extra></extra>",
+        ),
+    ))
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 110,
+        margin=dict(l=12, r=12, t=40, b=20),
+        title=dict(text=f"Funnel leak ({year}): applications to outcomes", font=dict(size=13), x=0, xanchor="left"),
+        showlegend=False,
+    ))
+    return fig
+
+
+def fig_ch6_great_decoupling(df_ho: pd.DataFrame, df_collapse: pd.DataFrame) -> go.Figure:
+    """Chapter 6: indexed homeownership vs indexed credit conditions (2007=100)."""
+    fig = go.Figure()
+    if df_ho is None or df_ho.empty or df_collapse is None or df_collapse.empty:
+        return fig
+
+    h = df_ho[["year", "homeownership_rate"]].dropna().copy()
+    c = df_collapse[["year", "origination_rate"]].dropna().copy()
+    d = h.merge(c, on="year", how="inner").sort_values("year")
+    if d.empty:
+        return fig
+
+    h0 = d[d["year"] == 2007]["homeownership_rate"]
+    c0 = d[d["year"] == 2007]["origination_rate"]
+    if h0.empty or c0.empty or float(h0.iloc[0]) == 0 or float(c0.iloc[0]) == 0:
+        return fig
+
+    d["home_idx"] = (d["homeownership_rate"] / float(h0.iloc[0])) * 100.0
+    d["credit_idx"] = (d["origination_rate"] / float(c0.iloc[0])) * 100.0
+    fig.add_trace(go.Scatter(
+        x=d["year"], y=d["credit_idx"],
+        mode="lines+markers",
+        name="Credit conditions index",
+        line=dict(color=C["govt"], width=2.6, shape="spline", smoothing=0.65),
+        marker=dict(size=5),
+        hovertemplate="Credit index<br>%{x}: %{y:.1f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=d["year"], y=d["home_idx"],
+        mode="lines+markers",
+        name="Homeownership index",
+        line=dict(color=C["warning"], width=2.6, shape="spline", smoothing=0.65),
+        marker=dict(size=5),
+        hovertemplate="Homeownership index<br>%{x}: %{y:.1f}<extra></extra>",
+    ))
+
+    post = d[d["year"] >= 2012]
+    if not post.empty:
+        fig.add_trace(go.Scatter(
+            x=post["year"], y=post["credit_idx"],
+            mode="lines",
+            line=dict(width=0),
+            hoverinfo="skip",
+            showlegend=False,
+        ))
+        fig.add_trace(go.Scatter(
+            x=post["year"], y=post["home_idx"],
+            mode="lines",
+            fill="tonexty",
+            fillcolor="rgba(215,38,30,0.10)",
+            line=dict(width=0),
+            hoverinfo="skip",
+            showlegend=False,
+        ))
+
+    fig.add_hline(y=100, line=dict(color=C["muted"], width=1.1, dash="dot"))
+    if (d["year"] == 2013).any():
+        fig.add_vline(x=2013, line=dict(color=C["crash"], width=1.2, dash="dash"))
+        fig.add_annotation(
+            x=2013.1, y=0.95, xref="x", yref="paper",
+            text="The Decoupling Point",
+            showarrow=False, xanchor="left",
+            font=dict(size=10, color=C["crash"]),
+            bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+        )
+    fig.add_annotation(
+        x=0.78, y=0.20, xref="paper", yref="paper",
+        text="The Rent Gap:<br>markets recovered, people didn't.",
+        showarrow=False, xanchor="center",
+        font=dict(size=10, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+    )
+    fig.update_layout(**_base_layout(
+        height=H_SM + 70,
+        margin=dict(l=52, r=24, t=38, b=50),
+        title=dict(text="", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"]),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, title="Index (Baseline 2007 = 100)"),
+        legend=dict(
+            x=0.98, y=0.98, xanchor="right", yanchor="top",
+            bgcolor="rgba(255,255,255,0.85)", bordercolor=C["border"], borderwidth=0.5,
+        ),
+    ))
+    return fig
+
+
 def fig_ch1_risk_mix(df: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     if df is None or df.empty:
@@ -1956,6 +2721,888 @@ def fig_fha_phases(df: pd.DataFrame) -> go.Figure:
         showlegend=False,
     ))
 
+    return fig
+
+
+def fig_ch4_refi_mirage(df_pr: pd.DataFrame, df_ho: pd.DataFrame) -> go.Figure:
+    """Chapter 4: refinance surge vs homeownership floor."""
+    fig = go.Figure()
+    if df_pr is None or df_pr.empty:
+        return fig
+
+    d = df_pr.copy().sort_values("year")
+    ho = df_ho[["year", "homeownership_rate"]].copy() if df_ho is not None and not df_ho.empty else pd.DataFrame(columns=["year", "homeownership_rate"])
+    m = d.merge(ho, on="year", how="left")
+
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["purchase"],
+        mode="lines",
+        name="Purchase",
+        stackgroup="one",
+        line=dict(color=C["purchase"], width=2.2, shape="spline", smoothing=0.65),
+        fill="tozeroy",
+        hovertemplate="Purchase: %{y:,.0f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["refinance"],
+        mode="lines",
+        name="Refinance",
+        stackgroup="one",
+        line=dict(color=C["crash"], width=2.2, shape="spline", smoothing=0.65),
+        fill="tonexty",
+        hovertemplate="Refinance: %{y:,.0f}<extra></extra>",
+    ))
+
+    if "homeownership_rate" in m.columns and m["homeownership_rate"].notna().any():
+        fig.add_trace(go.Scatter(
+            x=m["year"], y=m["homeownership_rate"],
+            mode="lines+markers",
+            name="Homeownership floor",
+            yaxis="y2",
+            line=dict(color=C["muted"], width=2.0, dash="dash"),
+            marker=dict(size=4),
+            hovertemplate="Homeownership: %{y:.1f}%<extra></extra>",
+        ))
+        base = m[m["year"] == 2007]["homeownership_rate"]
+        if not base.empty:
+            fig.add_hline(y=float(base.iloc[0]), yref="y2", line=dict(color=C["muted"], width=1, dash="dot"))
+
+    cond = (m["refinance"] > m["purchase"])
+    if "homeownership_rate" in m.columns and m["homeownership_rate"].notna().any():
+        h07 = m[m["year"] == 2007]["homeownership_rate"]
+        if not h07.empty:
+            cond = cond & (m["homeownership_rate"] <= float(h07.iloc[0]))
+    years = m.loc[cond, "year"].tolist()
+    if years:
+        fig.add_vrect(
+            x0=min(years) - 0.2, x1=max(years) + 0.2,
+            fillcolor="rgba(215,38,30,0.08)", line_width=0,
+        )
+        fig.add_annotation(
+            x=min(years), y=0.98, xref="x", yref="paper",
+            text="Refi mirage zone: debt churn without ownership lift",
+            showarrow=False, xanchor="left",
+            font=dict(size=10, color=C["crash"]),
+            bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
+        )
+
+    fig.update_layout(**_base_layout(
+        height=H,
+        margin=dict(l=54, r=52, t=40, b=48),
+        title=dict(text="The refi mirage: volume rose while ownership stalled", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"]),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickformat=".2s", title="Loan count"),
+        yaxis2=dict(
+            overlaying="y", side="right", showgrid=False, zeroline=False,
+            tickformat=".1f", title="Homeownership rate (%)",
+        ),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+def fig_ch6_funnel_compare(df_denial: pd.DataFrame, df_loan: pd.DataFrame, year: int = 2017) -> go.Figure:
+    """Chapter 6: side-by-side funnel leak comparison for two borrower profiles."""
+    fig = go.Figure()
+    if df_denial is None or df_denial.empty or df_loan is None or df_loan.empty:
+        return fig
+
+    def profile_data(profile: str):
+        race, band = profile.split("|", 1)
+        den = df_denial[(df_denial["year"] == year) & (df_denial["race"] == race) & (df_denial["income_band"] == band)]
+        if den.empty:
+            return None
+        denial_rate = float(den["denial_rate"].iloc[0])
+        applications = 10000.0
+        denied = applications * denial_rate
+        approved = applications - denied
+        conv = approved / applications if applications else 0.0
+        lt = df_loan[df_loan["year"] == year].copy()
+        lt = lt.groupby("loan_type", as_index=False)["share"].sum()
+        lt = lt[lt["loan_type"].isin(["Conventional", "FHA", "VA", "FSA/RHS"])].copy()
+        if lt.empty:
+            return None
+        lt["share_norm"] = lt["share"] / lt["share"].sum()
+        lt["approved_flow"] = approved * lt["share_norm"]
+        return race, band, approved, denied, conv, lt
+
+    left = profile_data("White|100-150K")
+    right = profile_data("Black / African American|<50K")
+    if left is None or right is None:
+        return fig
+
+    for i, p in enumerate([left, right]):
+        race, band, approved, denied, conv, lt = p
+        nodes = [f"Applications\n{race}, {band}", "Approved", "Denied"] + lt["loan_type"].tolist()
+        source = [0, 0] + [1] * len(lt)
+        target = [1, 2] + list(range(3, 3 + len(lt)))
+        value = [approved, denied] + lt["approved_flow"].tolist()
+        domain_x = [0.00, 0.46] if i == 0 else [0.54, 1.00]
+
+        fig.add_trace(go.Sankey(
+            domain=dict(x=domain_x, y=[0.08, 0.95]),
+            arrangement="snap",
+            node=dict(
+                label=nodes,
+                color=[C["muted"], C["recovery"], C["crash"]] + [C["govt"]] * len(lt),
+                pad=16,
+                thickness=16,
+                line=dict(color="rgba(255,255,255,0.85)", width=0.8),
+            ),
+            link=dict(
+                source=source,
+                target=target,
+                value=value,
+                color=["rgba(44,122,90,0.45)", "rgba(215,38,30,0.52)"] + ["rgba(40,92,154,0.24)"] * len(lt),
+                hovertemplate="%{source.label} -> %{target.label}<br>Flow: %{value:,.0f}<extra></extra>",
+            ),
+        ))
+        cx = (domain_x[0] + domain_x[1]) / 2.0
+        fig.add_annotation(
+            x=cx, y=1.02, xref="paper", yref="paper",
+            text=f"{race}, {band}<br>Conversion rate: {conv:.0%}",
+            showarrow=False, xanchor="center",
+            font=dict(size=10, color=C["text"]),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
+        )
+
+    fig.add_annotation(
+        x=0.87, y=0.52, xref="paper", yref="paper",
+        text="Denied leak",
+        showarrow=True, arrowhead=2, ax=40, ay=-20,
+        font=dict(size=13, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.95)", bordercolor=C["crash"], borderwidth=0.7, borderpad=3,
+    )
+
+    try:
+        conv_white = float(left[4])
+        conv_black = float(right[4])
+        fig.add_annotation(
+            x=0.50, y=0.02, xref="paper", yref="paper",
+            text=f"Conversion gap: White {conv_white:.0%} vs Black {conv_black:.0%}",
+            showarrow=False, xanchor="center",
+            font=dict(size=10, color=C["crash"]),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor=C["crash"], borderwidth=0.6, borderpad=4,
+        )
+    except Exception:
+        pass
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 170,
+        margin=dict(l=10, r=10, t=44, b=18),
+        title=dict(text="The Hidden Filter: Parallel Realities in Credit Access", font=dict(size=13), x=0, xanchor="left"),
+        showlegend=False,
+    ))
+    return fig
+
+
+def fig_ch7_handover_race(df: pd.DataFrame, top_n: int = 10) -> go.Figure:
+    """Chapter 7: lender handover race (top lenders by share, animated by year)."""
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    d = (
+        df.groupby(["year", "institution", "lender_type"], as_index=False)["originations"]
+        .sum()
+        .dropna(subset=["year", "institution", "originations"])
+    )
+    if d.empty:
+        return fig
+
+    total = d.groupby("year", as_index=False)["originations"].sum().rename(columns={"originations": "year_total"})
+    d = d.merge(total, on="year", how="left")
+    d["share"] = d["originations"] / d["year_total"].replace(0, np.nan)
+    d = d.sort_values(["year", "share"], ascending=[True, False])
+    d["rank"] = d.groupby("year")["share"].rank(method="first", ascending=False)
+    d = d[d["rank"] <= top_n].copy()
+    if d.empty:
+        return fig
+
+    years = sorted(d["year"].unique().tolist())
+    color_map = {"Bank": "#59616C", "Nonbank": C["nonbank"]}
+
+    def _frame_data(y):
+        s = d[d["year"] == y].sort_values("share", ascending=True)
+        return go.Bar(
+            x=s["share"],
+            y=s["institution"],
+            orientation="h",
+            marker=dict(color=[color_map.get(t, C["muted"]) for t in s["lender_type"]]),
+            customdata=np.c_[s["lender_type"], s["originations"]],
+            hovertemplate="<b>%{y}</b><br>Type: %{customdata[0]}<br>Share: %{x:.1%}<br>Originations: %{customdata[1]:,.0f}<extra></extra>",
+        )
+
+    fig.add_trace(_frame_data(years[0]))
+
+    frames = []
+    for y in years:
+        frames.append(go.Frame(data=[_frame_data(y)], name=str(y)))
+    fig.frames = frames
+
+    # Structural annotations (static)
+    by_type = d.groupby(["year", "lender_type"], as_index=False)["originations"].sum()
+    piv = by_type.pivot(index="year", columns="lender_type", values="originations").fillna(0).reset_index().sort_values("year")
+    if "Bank" not in piv.columns:
+        piv["Bank"] = 0
+    if "Nonbank" not in piv.columns:
+        piv["Nonbank"] = 0
+    denom = (piv["Bank"] + piv["Nonbank"]).replace(0, np.nan)
+    piv["nonbank_share"] = piv["Nonbank"] / denom
+    over = piv[piv["nonbank_share"] >= 0.5]
+    crossover = int(over["year"].min()) if not over.empty else 2014
+    share_2017 = float(piv[piv["year"] == 2017]["nonbank_share"].iloc[0]) if len(piv[piv["year"] == 2017]) else np.nan
+
+    fig.add_annotation(
+        x=0.02, y=0.98, xref="paper", yref="paper",
+        text="2012: Basel III / Dodd-Frank impact",
+        showarrow=False, xanchor="left", yanchor="top",
+        font=dict(size=9, color=C["muted"]),
+        bgcolor="rgba(255,255,255,0.9)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
+    )
+    fig.add_annotation(
+        x=0.98, y=0.98, xref="paper", yref="paper",
+        text=f"Great Handover: nonbanks cross 50% in {crossover}; reach {share_2017:.0%} by 2017" if share_2017 == share_2017 else f"Great Handover: nonbanks cross 50% in {crossover}",
+        showarrow=False, xanchor="right", yanchor="top",
+        font=dict(size=9, color=C["nonbank"]),
+        bgcolor="rgba(255,255,255,0.9)", bordercolor=C["nonbank"], borderwidth=0.5, borderpad=3,
+    )
+
+    steps = []
+    for y in years:
+        steps.append(
+            dict(
+                label=str(y),
+                method="animate",
+                args=[[str(y)], {"mode": "immediate", "frame": {"duration": 220, "redraw": True}, "transition": {"duration": 120}}],
+            )
+        )
+
+    fig.update_layout(**_base_layout(
+        height=H_LG,
+        margin=dict(l=220, r=24, t=34, b=52),
+        title=dict(text="", x=0, xanchor="left"),
+        xaxis=dict(showgrid=True, gridcolor=C["grid"], tickformat=".0%", title="Share of originations"),
+        yaxis=dict(showgrid=False, tickcolor=C["border"], automargin=True),
+        showlegend=False,
+        updatemenus=[dict(
+            type="buttons", showactive=False, direction="left",
+            x=0.0, y=1.08, xanchor="left", yanchor="bottom",
+            buttons=[
+                dict(label="Play", method="animate", args=[None, {"fromcurrent": True, "frame": {"duration": 280, "redraw": True}, "transition": {"duration": 120}}]),
+                dict(label="Pause", method="animate", args=[[None], {"mode": "immediate", "frame": {"duration": 0, "redraw": False}, "transition": {"duration": 0}}]),
+            ],
+        )],
+        sliders=[dict(
+            active=0,
+            x=0.12, y=1.06, xanchor="left", yanchor="bottom",
+            len=0.86,
+            currentvalue=dict(prefix="Year: ", font=dict(size=11)),
+            steps=steps,
+        )],
+    ))
+    return fig
+
+
+def fig_ch4_yield_attrition(df_col: pd.DataFrame, y0: int = 2007, y1: int = 2017) -> go.Figure:
+    """Chapter 4: origination yield attrition (applications -> originations)."""
+    fig = go.Figure()
+    if df_col is None or df_col.empty:
+        return fig
+
+    d0 = df_col[df_col["year"] == y0]
+    d1 = df_col[df_col["year"] == y1]
+    if d0.empty or d1.empty:
+        return fig
+
+    a0, o0 = float(d0["applications"].iloc[0]), float(d0["originations"].iloc[0])
+    a1, o1 = float(d1["applications"].iloc[0]), float(d1["originations"].iloc[0])
+    yld0 = (o0 / a0) if a0 else 0.0
+    yld1 = (o1 / a1) if a1 else 0.0
+
+    fig.add_trace(go.Funnel(
+        name=str(y0),
+        y=["Applications", "Originations"],
+        x=[a0, o0],
+        textinfo="value+percent initial",
+        marker=dict(color=["rgba(90,90,90,0.65)", "rgba(44,122,90,0.75)"]),
+        hovertemplate=f"{y0} - %{{y}}: %{{x:,.0f}}<extra></extra>",
+    ))
+    fig.add_trace(go.Funnel(
+        name=str(y1),
+        y=["Applications", "Originations"],
+        x=[a1, o1],
+        textinfo="value+percent initial",
+        marker=dict(color=["rgba(150,150,150,0.40)", "rgba(215,38,30,0.75)"]),
+        hovertemplate=f"{y1} - %{{y}}: %{{x:,.0f}}<extra></extra>",
+    ))
+
+    fig.add_annotation(
+        x=0.5, y=1.04, xref="paper", yref="paper",
+        text=f"Yield: {y0}={yld0:.0%} vs {y1}={yld1:.0%}",
+        showarrow=False,
+        font=dict(size=10, color=C["text"]),
+        bgcolor="rgba(255,255,255,0.92)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
+    )
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 90,
+        margin=dict(l=54, r=24, t=42, b=34),
+        title=dict(text="Efficiency gap: the funnel got thirstier", font=dict(size=13), x=0, xanchor="left"),
+        funnelmode="group",
+        xaxis=dict(showgrid=True, gridcolor=C["grid"], tickformat=".2s", title="Count"),
+        yaxis=dict(showgrid=False),
+        legend=dict(orientation="h", x=0, y=1.01, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+# Chapter 4 overrides (last definition wins)
+def fig_ch4_refi_mirage(df_pr: pd.DataFrame, df_ho: pd.DataFrame) -> go.Figure:
+    """Slide 1: stacked purchase/refi area + bold homeownership floor line."""
+    fig = go.Figure()
+    if df_pr is None or df_pr.empty:
+        return fig
+
+    d = df_pr.copy().sort_values("year")
+    ho = df_ho[["year", "homeownership_rate"]].copy() if df_ho is not None and not df_ho.empty else pd.DataFrame(columns=["year", "homeownership_rate"])
+    m = d.merge(ho, on="year", how="left")
+
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["purchase"],
+        mode="lines", name="Purchase",
+        stackgroup="one", fill="tozeroy",
+        line=dict(color=C["purchase"], width=2.4, shape="spline", smoothing=0.65),
+        hovertemplate="Purchase: %{y:,.0f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["refinance"],
+        mode="lines", name="Refinance",
+        stackgroup="one", fill="tonexty",
+        line=dict(color=C["crash"], width=2.4, shape="spline", smoothing=0.65),
+        hovertemplate="Refinance: %{y:,.0f}<extra></extra>",
+    ))
+
+    if "homeownership_rate" in m.columns and m["homeownership_rate"].notna().any():
+        fig.add_trace(go.Scatter(
+            x=m["year"], y=m["homeownership_rate"],
+            mode="lines+markers", name="Homeownership rate",
+            yaxis="y2",
+            line=dict(color="#111111", width=4.2),
+            marker=dict(size=5, color="#111111"),
+            hovertemplate="Homeownership: %{y:.1f}%<extra></extra>",
+        ))
+
+    # Big 2012 callout bubble
+    c2012 = m[m["year"] == 2012]
+    if not c2012.empty:
+        row = c2012.iloc[0]
+        total = float(row["purchase"] + row["refinance"])
+        refi_share = (float(row["refinance"]) / total) if total else 0.0
+        txt = f"2012 Peak: 72% Refinance Share<br>Volume hit 8.1M — but zero new owners created"
+        fig.add_annotation(
+            x=2012, y=float(row["refinance"] + row["purchase"]) * 0.88,
+            text=txt,
+            showarrow=True, arrowhead=2, arrowwidth=1.4, ax=120, ay=-50,
+            font=dict(size=11, color=C["crash"]),
+            bgcolor="rgba(255,255,255,0.97)", bordercolor=C["crash"], borderwidth=1.2, borderpad=6,
+        )
+
+    # Decoupling annotation: volume recovered but homeownership kept falling
+    if "homeownership_rate" in m.columns and m["homeownership_rate"].notna().any():
+        ho_2012 = m.loc[m["year"] == 2012, "homeownership_rate"]
+        ho_2017 = m.loc[m["year"] == 2017, "homeownership_rate"]
+        if not ho_2012.empty and not ho_2017.empty:
+            fig.add_annotation(
+                x=2014.5, y=float(ho_2017.iloc[0]),
+                xref="x", yref="y2",
+                text="Homeownership fell 4.2pp<br>as volume recovered — decoupling",
+                showarrow=True, arrowhead=2, arrowwidth=1.2, ax=0, ay=-50,
+                font=dict(size=10, color="#111111"),
+                bgcolor="rgba(255,255,255,0.95)", bordercolor="#111111", borderwidth=0.8, borderpad=5,
+            )
+
+    fig.update_layout(**_base_layout(
+        height=H,
+        margin=dict(l=54, r=64, t=52, b=48),
+        title=dict(text="The Refi Mirage: Volume Recovered, Homeownership Stalled", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007–2017)"),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickformat=".2s", title="Loan Volume (Millions)"),
+        yaxis2=dict(
+            overlaying="y", side="right", showgrid=False, zeroline=False,
+            tickformat=".1f", title="Homeownership Rate (%)",
+            range=[60, 72],
+        ),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+def fig_ch4_yield_attrition(df_col: pd.DataFrame, y0: int = 2007, y1: int = 2017) -> go.Figure:
+    """Slide 2: side-by-side funnels and vanishing-market annotation."""
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        specs=[[{"type": "funnel"}, {"type": "funnel"}]],
+        subplot_titles=(f"{y0} baseline", f"{y1} recovery year"),
+        horizontal_spacing=0.12,
+    )
+    if df_col is None or df_col.empty:
+        return fig
+
+    d0 = df_col[df_col["year"] == y0]
+    d1 = df_col[df_col["year"] == y1]
+    if d0.empty or d1.empty:
+        return fig
+
+    a0, o0 = float(d0["applications"].iloc[0]), float(d0["originations"].iloc[0])
+    a1, o1 = float(d1["applications"].iloc[0]), float(d1["originations"].iloc[0])
+    yld0 = (o0 / a0) if a0 else 0.0
+    yld1 = (o1 / a1) if a1 else 0.0
+    vol_drop = o0 - o1
+
+    fig.add_trace(go.Funnel(
+        name=f"{y0}",
+        y=["Applications", "Originations"],
+        x=[a0, o0],
+        textinfo="value+percent initial",
+        marker=dict(color=["rgba(110,110,110,0.62)", "rgba(44,122,90,0.78)"]),
+        hovertemplate=f"{y0} - %{{y}}: %{{x:,.0f}}<extra></extra>",
+        showlegend=False,
+    ), row=1, col=1)
+    fig.add_trace(go.Funnel(
+        name=f"{y1}",
+        y=["Applications", "Originations"],
+        x=[a1, o1],
+        textinfo="value+percent initial",
+        marker=dict(color=["rgba(160,160,160,0.40)", "rgba(215,38,30,0.80)"]),
+        hovertemplate=f"{y1} - %{{y}}: %{{x:,.0f}}<extra></extra>",
+        showlegend=False,
+    ), row=1, col=2)
+    fig.add_annotation(
+        x=0.50, y=1.12, xref="paper", yref="paper",
+        text=f"Conversion rate improved: {y0} {yld0:.0%}  →  {y1} {yld1:.0%}",
+        showarrow=False, font=dict(size=10, color=C["text"]),
+        bgcolor="rgba(255,255,255,0.95)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
+    )
+    fig.add_annotation(
+        x=0.50, y=0.06, xref="paper", yref="paper",
+        text=f"Originations down {vol_drop:,.0f} vs {y0} — the funnel got smaller even as conversion improved",
+        showarrow=False, font=dict(size=10, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.95)", bordercolor=C["crash"], borderwidth=0.8, borderpad=5,
+    )
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 110,
+        margin=dict(l=54, r=24, t=62, b=48),
+        title=dict(text="The Vanishing Market: Efficiency Rising, Access Falling", font=dict(size=13), x=0, xanchor="left"),
+        funnelmode="stack",
+        xaxis=dict(showgrid=False),
+        xaxis2=dict(showgrid=False),
+        yaxis=dict(showgrid=False),
+        yaxis2=dict(showgrid=False),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+def fig_ch4_lti_income_groups(df: pd.DataFrame) -> go.Figure:
+    """Slide 3: middle-income emphasis with safety ceiling crossing."""
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    d = df.dropna(subset=["year", "income_band", "lti_ratio"]).copy()
+    if d.empty:
+        return fig
+
+    d["group"] = d["income_band"].map({
+        "<50K": "Low income (<50K)",
+        "50-80K": "Middle income (50-100K)",
+        "80-100K": "Middle income (50-100K)",
+        "100-150K": "Higher income (100K+)",
+        "150K+": "Higher income (100K+)",
+    })
+    d = d.dropna(subset=["group"])
+    g = d.groupby(["year", "group"], as_index=False)["lti_ratio"].median().rename(columns={"lti_ratio": "median_lti"})
+
+    series = {
+        "Low income (<50K)": {"color": "#9A9A9A", "w": 1.8},
+        "Higher income (100K+)": {"color": "#7E7E7E", "w": 1.8},
+        "Middle income (50-100K)": {"color": C["warning"], "w": 3.6},
+    }
+    for name, st in series.items():
+        s = g[g["group"] == name].sort_values("year")
+        if s.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=s["year"], y=s["median_lti"],
+            mode="lines+markers",
+            name=name,
+            line=dict(color=st["color"], width=st["w"], shape="spline", smoothing=0.65),
+            marker=dict(size=5),
+            hovertemplate=f"{name}<br>%{{x}}: %{{y:.2f}}x<extra></extra>",
+        ))
+
+    fig.add_hline(y=3.0, line=dict(color=C["crash"], width=2.4, dash="dash"))
+    x_mid = float(g["year"].median()) if not g.empty else 2012
+    fig.add_annotation(
+        x=x_mid, y=3.0,
+        text="<b>Safety Ceiling (LTI = 3.0×)</b>",
+        showarrow=False,
+        yshift=10,
+        font=dict(size=11, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.8, borderpad=3,
+    )
+
+    mid = g[g["group"] == "Middle income (50-100K)"].sort_values("year")
+    cross = mid[mid["median_lti"] >= 3.0]
+    if not cross.empty:
+        c = cross.iloc[0]
+        fig.add_annotation(
+            x=float(c["year"]), y=float(c["median_lti"]),
+            text=f"Middle-income crosses ceiling ({int(c['year'])})",
+            showarrow=True, arrowhead=2, ax=40, ay=-35,
+            font=dict(size=10, color=C["warning"]),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor=C["warning"], borderwidth=0.7, borderpad=3,
+        )
+
+    latest_year = int(g["year"].max())
+    latest = g[g["year"] == latest_year].copy()
+    trough_year = int(mid.loc[mid["median_lti"].idxmin(), "year"]) if not mid.empty else latest_year
+    trough_val = float(mid["median_lti"].min()) if not mid.empty else float("nan")
+    if not latest.empty:
+        latest_mid = latest[latest["group"] == "Middle income (50-100K)"]
+        others = latest[latest["group"] != "Middle income (50-100K)"]
+        if not latest_mid.empty and not others.empty:
+            mid_v = float(latest_mid["median_lti"].iloc[0])
+            rise = (mid_v - trough_val) if trough_val == trough_val else 0.0
+            fig.add_annotation(
+                x=latest_year, y=mid_v,
+                text=f"Middle-income: +{rise:.2f}x since {trough_year} trough<br>Fastest-rising group — converging on 3.0× ceiling",
+                showarrow=True, arrowhead=2, ax=-210, ay=-40,
+                font=dict(size=10, color=C["warning"]),
+                bgcolor="rgba(255,255,255,0.95)", bordercolor=C["warning"], borderwidth=0.9, borderpad=4,
+            )
+
+    # Delta since 2012 callouts (velocity signal)
+    base_year = 2012
+    deltas = []
+    for grp in ["Low income (<50K)", "Middle income (50-100K)", "Higher income (100K+)"]:
+        s = g[g["group"] == grp].sort_values("year")
+        b = s[s["year"] == base_year]["median_lti"]
+        l = s[s["year"] == latest_year]["median_lti"]
+        if len(b) and len(l):
+            deltas.append((grp, float(l.iloc[0] - b.iloc[0]), float(l.iloc[0])))
+    if deltas:
+        # Put middle-income first in annotation text
+        order = {"Middle income (50-100K)": 0, "Higher income (100K+)": 1, "Low income (<50K)": 2}
+        deltas = sorted(deltas, key=lambda t: order.get(t[0], 9))
+        delta_txt = " | ".join([f"{gname.split(' ')[0]} Δ since 2012: {dv:+.2f}x" for gname, dv, _ in deltas])
+        fig.add_annotation(
+            x=0.02, y=0.98, xref="paper", yref="paper",
+            text=delta_txt,
+            showarrow=False, xanchor="left", yanchor="top",
+            font=dict(size=9, color=C["muted"]),
+            bgcolor="rgba(255,255,255,0.92)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
+        )
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 100,
+        margin=dict(l=54, r=24, t=52, b=48),
+        title=dict(text="The Squeezed Middle: Leverage Accelerating Toward the Ceiling", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007–2017)"),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, title="Median Loan-to-Income Ratio (×)", range=[1.5, 3.5]),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+# Chapter 5 polish overrides (last definition wins)
+def fig_recovery_map_discrete(df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    d = df.copy()
+    d["category_code"] = d["rvs_years"].apply(lambda v: 0 if v <= 2 else (1 if v <= 4 else 2))
+    d["category_label"] = d["rvs_years"].apply(
+        lambda v: "Fast (≤2 years)" if v <= 2 else ("Medium (3–4 years)" if v <= 4 else "Slow (5+ years)")
+    )
+    has_lti = "median_lti_2017" in d.columns
+    if has_lti:
+        d["lti_vs_2007_baseline"] = d["median_lti_2017"] - 3.0
+
+    custom_cols = ["rvs_years", "category_label"] + (["median_lti_2017", "lti_vs_2007_baseline"] if has_lti else [])
+    hover = (
+        "<b>%{location}</b><br>"
+        "Recovery time: %{customdata[0]} years<br>"
+        "Category: %{customdata[1]}<br>"
+    )
+    if has_lti:
+        hover += "Median LTI (2017): %{customdata[2]:.2f}×<br>vs 3.0× baseline: %{customdata[3]:+.2f}×"
+    hover += "<extra></extra>"
+
+    fig.add_trace(go.Choropleth(
+        locations=d["state"],
+        z=d["category_code"],
+        locationmode="USA-states",
+        colorscale=[
+            [0.0,    "#2E8B57"], [0.3333, "#2E8B57"],   # Fast — green
+            [0.3334, "#D9A441"], [0.6666, "#D9A441"],   # Medium — amber
+            [0.6667, "#C23B31"], [1.0,    "#C23B31"],   # Slow — red
+        ],
+        zmin=0, zmax=2,
+        marker_line_color="#FFFFFF",
+        marker_line_width=0.8,
+        colorbar=dict(
+            title=dict(text="Recovery Speed", font=dict(size=10)),
+            tickmode="array",
+            tickvals=[0, 1, 2],
+            ticktext=["Fast (≤2 yrs)", "Medium (3–4 yrs)", "Slow (5+ yrs)"],
+            thickness=12,
+            len=0.52,
+            x=1.01,
+            y=0.5,
+        ),
+        customdata=d[custom_cols],
+        hovertemplate=hover,
+    ))
+
+    fig.update_geos(
+        scope="usa",
+        bgcolor=C["bg"],
+        showlakes=False,
+        showland=True,
+        landcolor="#F2F0EC",   # faint off-white — "no data" states nearly invisible
+        showcoastlines=False,
+        showframe=False,
+    )
+
+    # Sun-Belt Sprint callout
+    fig.add_annotation(
+        x=0.35, y=0.10, xref="paper", yref="paper",
+        text="Sun-Belt Sprint: Oil-state & Sun-Belt markets<br>bounced back in just 1–2 years",
+        showarrow=False, xanchor="center",
+        font=dict(size=9, color="#2E8B57"),
+        bgcolor="rgba(255,255,255,0.93)", bordercolor="#2E8B57", borderwidth=0.7, borderpad=4,
+    )
+
+    # Florida L-shaped lag
+    if (d["state"] == "FL").any():
+        fig.add_annotation(
+            x=0.80, y=0.22, xref="paper", yref="paper",
+            text="<b>Florida:</b> L-shaped lag —<br>stalled by foreclosure backlogs",
+            showarrow=True, arrowhead=2, arrowwidth=1.2, ax=55, ay=18,
+            font=dict(size=9, color=C["crash"]),
+            bgcolor="rgba(255,255,255,0.93)", bordercolor=C["crash"], borderwidth=0.7, borderpad=4,
+        )
+
+    fig.update_layout(
+        height=390,
+        margin=dict(l=10, r=80, t=52, b=28),
+        paper_bgcolor=C["bg"],
+        uirevision="keep",
+        transition=dict(duration=280, easing="cubic-in-out"),
+        font=dict(family=FONT, size=11),
+        geo=dict(bgcolor=C["bg"]),
+        title=dict(
+            text="Geography of Resilience: The Velocity of Survival",
+            font=dict(size=13),
+            x=0.02, xanchor="left", y=0.98, yanchor="top",
+        ),
+    )
+    return fig
+
+
+def fig_bank_nonbank_slope(df: pd.DataFrame) -> go.Figure:
+    bank    = df[df["lender_type"] == "Bank"].sort_values("year")
+    nonbank = df[df["lender_type"] == "Nonbank"].sort_values("year")
+    fig = go.Figure()
+
+    # Banks — thinner, muted
+    fig.add_trace(go.Scatter(
+        x=bank["year"], y=bank["share"], name="Banks",
+        mode="lines+markers",
+        line=dict(color="#23364D", width=2.4),
+        marker=dict(size=6),
+        hovertemplate="Banks %{x}: %{y:.1%}<extra></extra>",
+    ))
+    # Nonbanks — thicker, vibrant (the new winners)
+    fig.add_trace(go.Scatter(
+        x=nonbank["year"], y=nonbank["share"], name="Nonbanks",
+        mode="lines+markers",
+        line=dict(color="#E07B1A", width=4.8),
+        marker=dict(size=7, color="#E07B1A"),
+        hovertemplate="Nonbanks %{x}: %{y:.1%}<extra></extra>",
+    ))
+
+    # Endpoint stat labels: "70%" at 2007, "31%" at 2017 for banks
+    if not bank.empty:
+        b_start = bank.iloc[0]; b_end = bank.iloc[-1]
+        for row, lbl, ax_ in [(b_start, f"{float(b_start['share']):.0%}", -28), (b_end, f"{float(b_end['share']):.0%}", 28)]:
+            fig.add_annotation(
+                x=float(row["year"]), y=float(row["share"]),
+                text=f"<b>{lbl}</b>", showarrow=False,
+                font=dict(size=10, color="#23364D"), yshift=14,
+            )
+    if not nonbank.empty:
+        n_start = nonbank.iloc[0]; n_end = nonbank.iloc[-1]
+        for row in [n_start, n_end]:
+            fig.add_annotation(
+                x=float(row["year"]), y=float(row["share"]),
+                text=f"<b>{float(row['share']):.0%}</b>", showarrow=False,
+                font=dict(size=10, color="#E07B1A"), yshift=-18,
+            )
+
+    # 2013–2014 crossover line
+    cross_year = None
+    for i in range(len(bank) - 1):
+        b0 = float(bank["share"].iloc[i]); b1 = float(bank["share"].iloc[i + 1])
+        n0 = float(nonbank["share"].iloc[i]); n1 = float(nonbank["share"].iloc[i + 1])
+        if (b0 > n0) != (b1 > n1):
+            cross_year = int(bank["year"].iloc[i]); break
+    if cross_year:
+        fig.add_shape(
+            type="line", x0=cross_year + 0.5, x1=cross_year + 0.5,
+            y0=0.0, y1=1.0, xref="x", yref="paper",
+            line=dict(color=C["crash"], width=1.6, dash="dash"),
+        )
+        fig.add_annotation(
+            x=cross_year + 0.6, y=0.55,
+            text=f"<b>2013–2014 Crossover</b><br>Banks lost majority share",
+            showarrow=False, font=dict(size=10, color=C["crash"]), xanchor="left",
+            bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.7, borderpad=4,
+        )
+
+    # Regulatory retreat: Basel III / Dodd-Frank 2010-2012
+    fig.add_shape(
+        type="rect", x0=2010, x1=2012,
+        y0=0.0, y1=1.0, xref="x", yref="paper",
+        fillcolor="rgba(35,54,77,0.07)", line=dict(width=0),
+    )
+    fig.add_annotation(
+        x=2011, y=0.75,
+        text="Basel III /<br>Dodd-Frank<br>Impact",
+        showarrow=False, font=dict(size=9, color="#23364D"),
+        bgcolor="rgba(255,255,255,0.88)", bordercolor="#23364D", borderwidth=0.5, borderpad=3,
+    )
+
+    # Stat callout
+    fig.add_annotation(
+        x=0.01, y=0.04, xref="paper", yref="paper",
+        text="Banks: 70% → 31% of originations (2007–2017)",
+        showarrow=False, xanchor="left",
+        font=dict(size=10, color="#23364D"),
+        bgcolor="rgba(255,255,255,0.92)", bordercolor="#23364D", borderwidth=0.6, borderpad=4,
+    )
+
+    # Footer — systemic risk note
+    fig.add_annotation(
+        x=0.01, y=-0.14, xref="paper", yref="paper",
+        text="Note: Nonbanks operate without deposit insurance or Federal Reserve access — increasing systemic fragility",
+        showarrow=False, xanchor="left",
+        font=dict(size=9, color=C["muted"]),
+    )
+
+    fig.update_layout(**_base_layout(
+        height=H + 30,
+        margin=dict(l=54, r=48, t=52, b=64),
+        title=dict(text="The Great Handover: Banks Exit, Nonbanks Enter", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007–2017)"),
+        yaxis=dict(gridcolor=C["grid"], zeroline=False, tickformat=".0%", title="Share of Originations (%)", range=[0.15, 0.90]),
+        legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
+    ))
+    return fig
+
+
+def fig_recovery_vs_affordability(df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+
+    # Sort by LTI descending so highest-LTI state is at top
+    d = df.copy().sort_values("median_lti_2017", ascending=True)
+
+    # Color matches the map: Green=Fast, Amber=Medium, Red=Slow
+    FAST_COLOR   = "#2E8B57"
+    MEDIUM_COLOR = "#D9A441"
+    SLOW_COLOR   = "#C23B31"
+    colors = [FAST_COLOR if r <= 2 else (MEDIUM_COLOR if r <= 4 else SLOW_COLOR) for r in d["rvs_years"]]
+
+    # Recovery speed label for hover
+    speed_labels = ["Fast (≤2y)" if r <= 2 else ("Medium (3–4y)" if r <= 4 else "Slow (5+y)") for r in d["rvs_years"]]
+    d = d.copy()
+    d["speed_label"] = speed_labels
+
+    fig.add_trace(go.Bar(
+        x=d["median_lti_2017"],
+        y=d["state"],
+        orientation="h",
+        marker_color=colors,
+        marker_line_width=0,
+        text=[f"{v:.2f}×" for v in d["median_lti_2017"]],
+        textposition="outside",
+        textfont=dict(size=10),
+        customdata=list(zip(d["rvs_years"], d["speed_label"])),
+        hovertemplate="<b>%{y}</b><br>Median LTI (2017): %{x:.2f}×<br>Recovery: %{customdata[0]} years (%{customdata[1]})<extra></extra>",
+    ))
+
+    # 3.0× affordability ceiling
+    fig.add_vline(
+        x=3.0,
+        line=dict(color=C["crash"], width=2.0, dash="dash"),
+    )
+    fig.add_annotation(
+        x=3.0, y=1.0, xref="x", yref="paper",
+        text="<b>3.0× Affordability Threshold</b>",
+        showarrow=False, xanchor="left", yanchor="top",
+        font=dict(size=9, color=C["crash"]),
+        bgcolor="rgba(255,255,255,0.90)", bordercolor=C["crash"], borderwidth=0.6, borderpad=3,
+        xshift=4,
+    )
+
+    # Highlight CA, CO, TX as fast-recoverers above 3×
+    fast_above = d[(d["rvs_years"] <= 2) & (d["median_lti_2017"] >= 3.0)]
+    if not fast_above.empty:
+        states_str = ", ".join(sorted(fast_above["state"].tolist()))
+        fig.add_annotation(
+            x=0.98, y=0.04, xref="paper", yref="paper",
+            text=f"Fastest recoveries ({states_str}) all ended above 3.0×<br>Recovery and affordability moved in opposite directions",
+            showarrow=False, xanchor="right",
+            font=dict(size=9, color=FAST_COLOR),
+            bgcolor="rgba(255,255,255,0.93)", bordercolor=FAST_COLOR, borderwidth=0.7, borderpad=4,
+        )
+
+    # Manual legend (matches map)
+    for label, color, x_pos in [("Fast (≤2y)", FAST_COLOR, 0.01), ("Medium (3–4y)", MEDIUM_COLOR, 0.18), ("Slow (5+y)", SLOW_COLOR, 0.34)]:
+        fig.add_annotation(
+            x=x_pos, y=1.06, xref="paper", yref="paper",
+            text=f"<span style='color:{color}'>■</span> {label}",
+            showarrow=False, xanchor="left",
+            font=dict(size=10),
+        )
+
+    n_states = len(d)
+    bar_height = max(H, 60 + n_states * 30)
+
+    fig.update_layout(**_base_layout(
+        height=bar_height,
+        margin=dict(l=54, r=72, t=60, b=52),
+        title=dict(text="The Recovery Trap: Fast Recovery, Unaffordable Outcome", font=dict(size=13), x=0, xanchor="left"),
+        xaxis=dict(
+            showgrid=True, gridcolor=C["grid"], zeroline=False,
+            title="Median Loan-to-Income (LTI) Ratio (2017)",
+            tickcolor=C["border"],
+            range=[0, d["median_lti_2017"].max() * 1.18],
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False,
+            title="State (Ranked by LTI)",
+            tickfont=dict(size=11),
+        ),
+        showlegend=False,
+    ))
     return fig
 
 
