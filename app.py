@@ -159,6 +159,17 @@ def insight_chip(text, color=None):
         "marginBottom":"14px",
     })
 
+def key_insight(text):
+    return html.Div([
+        card([
+            html.Div("Key Insight", style={
+                "fontSize":"11px", "fontWeight":"700", "color":C["warning"], 
+                "letterSpacing":"0.06em", "textTransform":"uppercase", "marginBottom":"6px"
+            }),
+            html.Div(text, style={"fontSize":"15px", "fontWeight":"500", "fontStyle":"italic", "lineHeight":"1.5", "color":C["text"]})
+        ], pad="16px 20px")
+    ], style={"borderTop": f"3px solid {C['warning']}", "marginTop":"24px", "borderRadius":"12px"})
+
 def G(fig, gid=""):
     return dcc.Graph(id=gid if gid else {"type":"graph","idx":gid},
                      figure=fig, animate=False,
@@ -281,36 +292,34 @@ def p1(mode):
                 ], pad="18px 18px")
             ], style={"flex": "1.1", "minWidth": "260px"}),
         ], style={"display": "flex", "gap": "12px", "flexWrap": "wrap"}),
-        card([
-            html.Div(
-                "The key pre-crisis fact was concentration: one private channel carried almost all mortgage risk.",
-                style={"fontSize": "15px", "fontWeight": "500", "fontStyle": "italic", "textAlign": "center"},
-            )
-        ], pad="16px 22px"),
+        
+        key_insight("The key pre-crisis fact was concentration: one private channel carried almost all mortgage risk. Growth masked systemic fragility."),
     ])
 
 def p2(mode):
     df = _df_collapse()
     apps_2008 = int(df[df["year"] == 2008]["applications"].iloc[0]) if len(df[df["year"] == 2008]) else 0
-    gap_2011 = int((df[df["year"] == 2011]["applications"].iloc[0] - df[df["year"] == 2011]["originations"].iloc[0])) if len(df[df["year"] == 2011]) else 0
-    rate_2011 = float(df[df["year"] == 2011]["origination_rate"].iloc[0]) if len(df[df["year"] == 2011]) else 0.0
+    gap_2012 = int((df[df["year"] == 2012]["applications"].iloc[0] - df[df["year"] == 2012]["originations"].iloc[0])) if len(df[df["year"] == 2012]) else 0
+    rate_2012 = float(df[df["year"] == 2012]["origination_rate"].iloc[0]) if len(df[df["year"] == 2012]) else 0.0
     rate_2007 = float(df[df["year"] == 2007]["origination_rate"].iloc[0]) if len(df[df["year"] == 2007]) else 0.0
-    rate_change = ((rate_2011 / rate_2007) - 1.0) if rate_2007 else 0.0
-    stat_note = f"Origination rate {rate_2007:.0%}->{rate_2011:.0%} (2007->2011)." if rate_2007 else "Origination rate trend unavailable."
-    apps_2011 = int(df[df["year"] == 2011]["applications"].iloc[0]) if len(df[df["year"] == 2011]) else 0
-    gap_share_2011 = (gap_2011 / apps_2011) if apps_2011 else 0.0
+    rate_change = ((rate_2012 / rate_2007) - 1.0) if rate_2007 else 0.0
+    stat_note = f"Origination rate {rate_2007:.0%}->{rate_2012:.0%} (2007->2012)." if rate_2007 else "Origination rate trend unavailable."
+    apps_2012 = int(df[df["year"] == 2012]["applications"].iloc[0]) if len(df[df["year"] == 2012]) else 0
+    gap_share_2012 = (gap_2012 / apps_2012) if apps_2012 else 0.0
 
     return html.Div([
         chapter_title(2,"The Day the Machine Stopped","Demand persisted, but approval capacity broke."),
         kpi_row([kpi(f"{apps_2008:,.0f}","Applications in 2008",C["warning"],"Demand stayed present"),
-                 kpi(f"{gap_2011:,.0f}","Credit gap in 2011",C["crash"],"Applications - originations"),
-                 kpi(f"{rate_2011:.0%}","Approval rate in 2011",C["crash"],"Originations / applications")]),
-        insight_chip(f"So what: In 2011, about {gap_share_2011:.0%} of applications did not convert into originations.", C["crash"]),
+                 kpi(f"{gap_2012:,.0f}","Credit gap in 2012",C["crash"],"Applications - originations"),
+                 kpi(f"{rate_2012:.0%}","Approval rate in 2012",C["crash"],"Originations / applications")]),
+        insight_chip(f"So what: In 2012, about {gap_share_2012:.0%} of applications did not convert into originations.", C["crash"]),
         card([G(ch.fig_collapse(df),"collapse"),
               ann("The shock was institutional triage: lenders rationed approvals faster than households reduced demand.",
                   f"{stat_note} The widening gap tracks credit rationing, not a disappearance of would-be borrowers.",
                   mode),
               src("Federal Reserve Bulletin 2010","CFPB HMDA Data Point")]),
+              
+        key_insight("The system didn't just slow down; it broke structurally. Lenders rationed approvals aggressively, stranding millions of credit-worthy borrowers in an unmet demand gap."),
     ])
 
 def p3(mode):
@@ -358,12 +367,7 @@ def p3(mode):
                 ], style={"flex":"1","minWidth":"280px"}),
             ], style={"display":"flex","gap":"12px","flexWrap":"wrap","alignItems":"flex-start"}),
         ]),
-        card([
-            html.Div(
-                "Recovery was a handoff: mortgage risk migrated from private underwriting to publicly backed channels.",
-                style={"fontSize":"15px","fontWeight":"500","fontStyle":"italic","textAlign":"center"},
-            )
-        ], pad="16px 22px"),
+        key_insight("Recovery was a direct handoff: private balance sheets refused the risk, forcing public guarantees (like FHA) to fill the vacuum and subsidize the market's floor."),
     ])
 
 def p4(mode):
