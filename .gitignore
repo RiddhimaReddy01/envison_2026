@@ -1,0 +1,11 @@
+# Large temporary data files
+hmda_output/*.csv
+hmda_output/tmp*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
