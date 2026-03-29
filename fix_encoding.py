@@ -1,14 +1,12 @@
-import re
+"""
+Compatibility wrapper.
+Preferred location: `scripts/dev/fix_encoding.py`
+"""
 
-with open('data_ingestion.py', encoding='utf-8') as f:
-    content = f.read()
+from pathlib import Path
+import runpy
 
-# Replace all non-ASCII characters
-content = content.encode('ascii', errors='replace').decode('ascii')
-# Clean up the replacement marker
-content = content.replace('?', '?')  # keep ? as-is, they're readable
 
-with open('data_ingestion.py', 'w', encoding='utf-8') as f:
-    f.write(content)
+if __name__ == "__main__":
+    runpy.run_path(str(Path(__file__).resolve().parent / "scripts" / "dev" / "fix_encoding.py"), run_name="__main__")
 
-print("Done — all non-ASCII replaced with '?'")
