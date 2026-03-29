@@ -1,36 +1,43 @@
 """
-data_loader.py — Envision Hackathon 2026
+data_loader.py - Envision Hackathon 2026
 Single source of truth for all chart data.
-Real data only — no mock dependency.
+Real data only - no mock dependency.
 """
 
-import os
 import polars as pl
 
+from paths import find_csv, find_parquet
+
 USE_REAL_DATA = True
-DATA_DIR = "./hmda_output"
 
 
 def _real_available():
-    return os.path.exists(f"{DATA_DIR}/hmda_aggregates.parquet")
+    return find_parquet("hmda_aggregates.parquet") is not None
 
 
 def _load(fname):
-    path = f"{DATA_DIR}/{fname}"
-    if not os.path.exists(path):
+    path = find_parquet(fname)
+    if path is None:
         return None
-    return pl.read_parquet(path)
+    return pl.read_parquet(str(path))
+
+
+def _load_csv(fname):
+    path = find_csv(fname)
+    if path is None:
+        return None
+    return pl.read_csv(str(path))
 
 
 def _rename_if_present(df, mapping):
-    """Rename only columns that actually exist — avoids Polars errors on missing keys."""
+    """Rename only columns that actually exist - avoids Polars errors on missing keys."""
     actual = {k: v for k, v in mapping.items() if k in df.columns}
     return df.rename(actual) if actual else df
 
 
-# ─────────────────────────────────────────────
-# PUBLIC API — one function per chart
-# ─────────────────────────────────────────────
+# -------------------------------------------------------------
+# PUBLIC API - one function per chart
+# -------------------------------------------------------------
 
 def collapse_data():
     """Ch 2: Applications vs Originations by year"""
@@ -206,8 +213,7 @@ def recovery_drivers_state():
       - nonbank_accel_pp
       - price_recovery_lag_years
     """
-    path = f"{DATA_DIR}/recovery_drivers_state.parquet"
-    if USE_REAL_DATA and os.path.exists(path):
+    if USE_REAL_DATA and find_parquet("recovery_drivers_state.parquet") is not None:
         df = _load("recovery_drivers_state.parquet")
         if df is not None:
             return _rename_if_present(df, {"rvs_years": "recovery_years"})
@@ -419,7 +425,9 @@ def moderate_income_denial():
                 (pl.col("denied") / pl.col("applications")).alias("denial_rate_moderate_income")
             )
         )
-        ext = pl.read_csv(f"{DATA_DIR}/external_overlays.csv")
+        ext = _load_csv("external_overlays.csv")
+        if ext is None:
+            return df
         return band.join(
             ext.rename({"year": "as_of_year"}), on="as_of_year"
         ).rename({"as_of_year": "year"})
@@ -443,7 +451,9 @@ def purchase_homeownership():
             .agg(pl.col("n_records").sum().alias("purchase_originations"))
             .with_columns(pl.col("as_of_year").cast(pl.Int32))
         )
-        ext = pl.read_csv(f"{DATA_DIR}/external_overlays.csv")
+        ext = _load_csv("external_overlays.csv")
+        if ext is None:
+            return df
         ext = (
             ext.rename({"year": "as_of_year"})
             .with_columns(pl.col("as_of_year").cast(pl.Int32))
@@ -463,10 +473,11 @@ def mortgage_rate_series():
     Ch 6 cost panel: annual 30-year mortgage rate.
     Uses local FRED-derived cache when available.
     """
-    path = f"{DATA_DIR}/fred_mortgage_annual.csv"
-    if os.path.exists(path):
+    if find_csv("fred_mortgage_annual.csv") is not None:
         try:
-            df = pl.read_csv(path)
+            df = _load_csv("fred_mortgage_annual.csv")
+            if df is None:
+                raise FileNotFoundError("fred_mortgage_annual.csv not found")
             if "year" in df.columns and "mortgage_rate_30y" in df.columns:
                 return (
                     df.select([
@@ -492,10 +503,11 @@ def homeownership_by_age():
     Ch 6: generational homeownership split.
     Uses local FRED cache for age 25-34 (young proxy) and 55-64 (boomer proxy).
     """
-    path = f"{DATA_DIR}/fred_homeownership_age_annual.csv"
-    if os.path.exists(path):
+    if find_csv("fred_homeownership_age_annual.csv") is not None:
         try:
-            df = pl.read_csv(path)
+            df = _load_csv("fred_homeownership_age_annual.csv")
+            if df is None:
+                raise FileNotFoundError("fred_homeownership_age_annual.csv not found")
             needed = {"year", "home_25_34", "home_55_64"}
             if needed.issubset(set(df.columns)):
                 return (

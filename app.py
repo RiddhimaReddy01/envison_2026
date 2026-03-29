@@ -247,13 +247,13 @@ def _ch8_pack():
         "score": score,
     }
 
-@lru_cache(maxsize=1)
-def _df_global_shockwave():
+@lru_cache(maxsize=8)
+def _df_global_shockwave(cache_sig: str):
     return wb.load_global_shockwave_summary()
 
-@lru_cache(maxsize=1)
-def _ch9_pack():
-    df_global, source = _df_global_shockwave()
+@lru_cache(maxsize=8)
+def _ch9_pack(cache_sig: str):
+    df_global, source = _df_global_shockwave(cache_sig)
     df = df_global.copy()
 
     worst_gdp = df.loc[df["gdp_growth_2009"].idxmin()] if not df.empty and df["gdp_growth_2009"].notna().any() else None
@@ -449,7 +449,6 @@ def navbar(active=1):
               "background":C["bg"],"borderBottom":f"0.5px solid {C['border']}",
               "position":"sticky","top":"0","zIndex":"100","fontFamily":FONT})
 
-# â”€â”€ Pages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def p1(mode):
     collapse = _df_collapse()
@@ -1003,7 +1002,8 @@ def p8(mode):
     ])
 
 def p9(mode):
-    pack = _ch9_pack()
+    cache_sig = wb.global_shockwave_cache_signature()
+    pack = _ch9_pack(cache_sig)
     df_global = pack["df_global"]
     source = pack["source"]
     worst_gdp = pack["worst_gdp"]
@@ -1106,7 +1106,6 @@ def export_print_view():
         *wrappers,
     ], style={"maxWidth":"1120px","margin":"0 auto","padding":"20px 24px 36px","fontFamily":FONT,"color":C["text"]})
 
-# â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.layout = html.Div([
     dcc.Location(id="url",refresh=False),
@@ -1121,7 +1120,6 @@ app.layout = html.Div([
     }),
 ], style={"background":C["surface"],"minHeight":"100vh"})
 
-# â”€â”€ Callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 PAGE_MAP = {
     "/chapter/1":(p1,1),"/chapter/2":(p2,2),"/chapter/3":(p3,3),

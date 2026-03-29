@@ -12,9 +12,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Tuple
 import json
+import os
 import urllib.request
 
 import pandas as pd
+from paths import PROCESSED_CACHE_DIR, ensure_data_dirs
 
 
 _COUNTRIES: List[Tuple[str, str, str]] = [
@@ -32,7 +34,7 @@ _INDICATORS = {
     "export_growth_2009": "NE.EXP.GNFS.KD.ZG",   # Exports growth (annual %)
 }
 
-_CACHE_PATH = Path("hmda_output/global_shockwave_cache.json")
+_CACHE_PATH = PROCESSED_CACHE_DIR / "global_shockwave_cache.json"
 
 
 def _backup_frame() -> pd.DataFrame:
@@ -153,6 +155,7 @@ def _from_api() -> pd.DataFrame:
 
 
 def _write_cache(df: pd.DataFrame) -> None:
+    ensure_data_dirs()
     _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "rows": df.to_dict(orient="records"),
@@ -168,6 +171,21 @@ def _read_cache() -> pd.DataFrame | None:
         return pd.DataFrame(payload.get("rows", []))
     except Exception:
         return None
+
+
+def global_shockwave_cache_signature() -> str:
+    """
+    Cache-buster signature for app-level memoization.
+    Changes when configured countries or local cache file mtime changes.
+    """
+    countries_sig = "|".join([f"{c}:{n}:{ch}" for c, n, ch in _COUNTRIES])
+    mtime = "none"
+    try:
+        if _CACHE_PATH.exists():
+            mtime = str(int(os.path.getmtime(_CACHE_PATH)))
+    except Exception:
+        mtime = "err"
+    return f"{countries_sig}::{mtime}"
 
 
 def _canonicalize(df: pd.DataFrame) -> pd.DataFrame:
@@ -234,7 +252,12 @@ def _canonicalize(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_global_shockwave_summary() -> Tuple[pd.DataFrame, str]:
-    # Try live API first.
+    # Fast path: local cache first for low-latency page loads.
+    cache_df = _read_cache()
+    if cache_df is not None and not cache_df.empty:
+        return _canonicalize(cache_df), "cache"
+
+    # If cache unavailable, try live API and persist.
     try:
         api_df = _from_api()
         api_df = _canonicalize(api_df)
@@ -243,10 +266,5 @@ def load_global_shockwave_summary() -> Tuple[pd.DataFrame, str]:
     except Exception:
         pass
 
-    # Then local cache.
-    cache_df = _read_cache()
-    if cache_df is not None and not cache_df.empty:
-        return _canonicalize(cache_df), "cache"
-
-    # Finally fallback snapshot.
+    # Final fallback snapshot.
     return _canonicalize(_backup_frame()), "backup"

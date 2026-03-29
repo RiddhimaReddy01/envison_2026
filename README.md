@@ -21,47 +21,28 @@ If `python` is not on PATH, use your interpreter directly (example):
 Run full pipeline:
 
 ```powershell
-python hmda_pipeline.py
+python compat/hmda_pipeline.py
 ```
 
 Patch denial rows only (if needed):
 
 ```powershell
-python patch_denials.py
+python compat/patch_denials.py
 ```
 
 Build recovery drivers for Chapter 5:
 
 ```powershell
-python build_recovery_drivers.py
-```
-
-Build causal panels and model outputs:
-
-```powershell
-python causal_data_build.py
-python causal_models.py
+python compat/build_recovery_drivers.py
 ```
 
 Verify output files:
 
 ```powershell
-python hmda_pipeline.py verify
+python compat/hmda_pipeline.py verify
 ```
 
-## 3) Smoke test visuals (no browser)
-
-```powershell
-python visual_smoke_test.py
-```
-
-This checks:
-- data loader outputs
-- chart construction
-- page constructors
-- callback figure functions
-
-## 4) Run app
+## 3) Run app
 
 ```powershell
 python app.py
@@ -76,6 +57,11 @@ Open:
 - Cached dataframes are used in `app.py` for smoother interactions.  
   Restart the app after regenerating parquet files.
 - Chapter 6 denial heatmap is sourced/interpolated and labeled as such; other Chapter 6 race-share visuals are computed directly from local HMDA aggregates.
+- Data layout:
+  - `data/raw/` for raw source extracts
+  - `data/processed/parquet/` for processed parquet files
+  - `data/processed/csv/` for processed csv files
+  - `data/processed/cache/` for API/cache artifacts
 
 ## Codebase layout (reproducible)
 
@@ -87,15 +73,17 @@ Open:
 - Pipeline:
   - `pipeline/build_hmda_pipeline.py`
   - `pipeline/patch_denials.py`
-  - `pipeline/export_parquet_csv.py`
   - `pipeline/build_recovery_drivers.py`
   - `pipeline/analyze_fha_recovery.py`
-  - `pipeline/causal/data_build.py`
-  - `pipeline/causal/models.py`
 - Dev diagnostics:
   - `scripts/dev/diagnose_data.py`
-  - `scripts/dev/visual_smoke_test.py`
   - `scripts/dev/profile_data.py`
-  - `scripts/dev/fix_encoding.py`
 
-Compatibility wrappers remain at repo root so existing commands continue to work.
+Compatibility wrappers live in `compat/`:
+- `compat/hmda_pipeline.py`
+- `compat/data_ingestion.py`
+- `compat/patch_denials.py`
+- `compat/build_recovery_drivers.py`
+- `compat/fha_recovery_analysis.py`
+- `compat/diagnose.py`
+- `compat/profile_data.py`

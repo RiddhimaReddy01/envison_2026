@@ -2,7 +2,7 @@
 Build Chapter 5 state-level recovery drivers dataset.
 
 Outputs:
-    hmda_output/recovery_drivers_state.parquet
+    data/processed/parquet/recovery_drivers_state.parquet
 
 Drivers:
   - Demand: employment recovery speed (BLS API, 2009 -> 2013)
@@ -22,7 +22,7 @@ import requests
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT_DIR = ROOT / "hmda_output"
+OUT_DIR = ROOT / "data" / "processed" / "parquet"
 OUT_PATH = OUT_DIR / "recovery_drivers_state.parquet"
 
 BLS_URL = "https://api.bls.gov/publicAPI/v2/timeseries/data/"

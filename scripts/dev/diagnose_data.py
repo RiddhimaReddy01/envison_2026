@@ -9,7 +9,8 @@ from pathlib import Path
 import polars as pl
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = ROOT / "hmda_output"
+DATA_DIR = ROOT / "data" / "processed" / "parquet"
+CSV_DIR = ROOT / "data" / "processed" / "csv"
 
 FILES = [
     "hmda_aggregates.parquet",
@@ -18,7 +19,6 @@ FILES = [
     "rvs_full.parquet",
     "msa_scissor.parquet",
     "lender_names.parquet",
-    "external_overlays.csv",
 ]
 
 print("=" * 60)
@@ -54,6 +54,18 @@ for fname in FILES:
 
     except Exception as exc:
         print(f"  ERROR reading: {exc}")
+
+csv_path = CSV_DIR / "external_overlays.csv"
+if csv_path.exists():
+    print(f"\n{'-' * 60}")
+    print(f"FILE: external_overlays.csv  ({csv_path.stat().st_size / 1e6:.1f}MB)")
+    try:
+        df = pl.read_csv(str(csv_path))
+        print(f"  rows:    {len(df):,}")
+        print(f"  columns: {df.width}")
+        print(f"  schema: {[f'{c}:{t}' for c, t in zip(df.columns, df.dtypes)]}")
+    except Exception as exc:
+        print(f"  ERROR reading external_overlays.csv: {exc}")
 
 print(f"\n{'=' * 60}")
 print("KEY CHECKS")

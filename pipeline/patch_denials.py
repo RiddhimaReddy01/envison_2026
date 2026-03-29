@@ -24,7 +24,7 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_DIR = ROOT / "hmda_output"
+OUTPUT_DIR = ROOT / "data" / "processed" / "parquet"
 AGG_FILE   = OUTPUT_DIR / "hmda_aggregates.parquet"
 
 MAX_WORKERS = 1   # 1 year at a time — each decompressed CSV is 2-4GB

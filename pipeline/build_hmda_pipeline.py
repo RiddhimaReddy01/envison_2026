@@ -16,7 +16,9 @@ Run:
     pip install polars pyarrow requests psutil
     python data_ingestion.py
 
-Outputs (./hmda_output/):
+Outputs:
+    data/processed/parquet/*.parquet
+    data/processed/csv/*.csv
     hmda_aggregates.parquet  ? count charts         (Ch 1-7)
     hmda_sample.parquet      ? 10% row sample        (Ch 4 violin, Ch 5 scissor)
     rvs_by_state.parquet     ? Recovery Velocity Score
@@ -52,7 +54,8 @@ except ImportError:
 TARGET_STATES = ["CA", "FL", "NV", "AZ", "TX", "CO", "WA", "MI", "OH", "NY", "IL"]
 YEARS         = list(range(2007, 2018))
 PROJECT_ROOT  = Path(__file__).resolve().parents[1]
-OUTPUT_DIR    = str(PROJECT_ROOT / "hmda_output")
+OUTPUT_PARQUET_DIR = str(PROJECT_ROOT / "data" / "processed" / "parquet")
+OUTPUT_CSV_DIR = str(PROJECT_ROOT / "data" / "processed" / "csv")
 
 # Verified URLs from https://www.consumerfinance.gov/data-research/hmda/historic-data/
 LAR_URL = (
@@ -388,7 +391,7 @@ def process_year(year, col_map, sep, gate):
             dat_files = [n for n in names if n.lower().endswith((".dat", ".txt", ".csv", ".pipe"))]
             fname     = dat_files[0] if dat_files else names[0]
             with z.open(fname) as zf, tempfile.NamedTemporaryFile(
-                suffix=".csv", delete=False, mode="wb", dir=OUTPUT_DIR
+                suffix=".csv", delete=False, mode="wb", dir=OUTPUT_PARQUET_DIR
             ) as tmp:
                 tmp_path = tmp.name
                 shutil.copyfileobj(zf, tmp, length=4 * 1024 * 1024)   # 4MB chunks
@@ -674,7 +677,8 @@ def process_ts(year, gate):
 # ?????????????????????????????????????????????????????????????????????????????
 
 def run_pipeline():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_PARQUET_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_CSV_DIR, exist_ok=True)
 
     # ?? Pre-flight: schema probe + worker count ??????????????????????
     log("HMDA PIPELINE ? ENVISION HACKATHON 2026", "HEAD")
@@ -688,7 +692,8 @@ def run_pipeline():
 
     max_workers = compute_max_workers()
     log(f"Workers: {max_workers}")
-    log(f"Output : {OUTPUT_DIR}/")
+    log(f"Output parquet : {OUTPUT_PARQUET_DIR}/")
+    log(f"Output csv     : {OUTPUT_CSV_DIR}/")
 
     # MemoryGate budget = workers ? RAM_PER_WORKER_GB
     gate_budget = int(max_workers * RAM_PER_WORKER_GB * 1e9)
@@ -761,14 +766,14 @@ def run_pipeline():
           .otherwise(pl.lit("Other"))
           .alias("loan_purpose_label"),
     ])
-    path_agg = f"{OUTPUT_DIR}/hmda_aggregates.parquet"
+    path_agg = f"{OUTPUT_PARQUET_DIR}/hmda_aggregates.parquet"
     agg_final.write_parquet(path_agg, compression="snappy")
     log(f"hmda_aggregates.parquet  ? {os.path.getsize(path_agg)/1e6:.1f} MB  ({len(agg_final):,} rows)", "OK")
 
     # ?? B: Sample ?????????????????????????????????????????????????????
     log("Building hmda_sample.parquet...")
     sample_final = pl.concat(sample_frames, how="diagonal")
-    path_sample  = f"{OUTPUT_DIR}/hmda_sample.parquet"
+    path_sample  = f"{OUTPUT_PARQUET_DIR}/hmda_sample.parquet"
     sample_final.write_parquet(path_sample, compression="snappy")
     log(f"hmda_sample.parquet      ? {os.path.getsize(path_sample)/1e6:.1f} MB  ({len(sample_final):,} rows)", "OK")
 
@@ -797,11 +802,11 @@ def run_pipeline():
         .with_columns((pl.col("first_recovery_year") - 2009).alias("rvs_years_from_trough"))
         .sort("rvs_years_from_trough")
     )
-    path_rvs = f"{OUTPUT_DIR}/rvs_by_state.parquet"
+    path_rvs = f"{OUTPUT_PARQUET_DIR}/rvs_by_state.parquet"
     rvs_score.write_parquet(path_rvs)
     log(f"rvs_by_state.parquet     ? {os.path.getsize(path_rvs)/1024:.0f} KB  ({len(rvs_score)} states)", "OK")
 
-    path_rvs_full = f"{OUTPUT_DIR}/rvs_full.parquet"
+    path_rvs_full = f"{OUTPUT_PARQUET_DIR}/rvs_full.parquet"
     rvs.write_parquet(path_rvs_full)
     log(f"rvs_full.parquet         ? {os.path.getsize(path_rvs_full)/1024:.0f} KB", "OK")
 
@@ -828,12 +833,12 @@ def run_pipeline():
             ts_final.select(join_keys + ["institution_name"]),
             on=join_keys, how="left"
         )
-        path_lender = f"{OUTPUT_DIR}/lender_names.parquet"
+        path_lender = f"{OUTPUT_PARQUET_DIR}/lender_names.parquet"
         lender_final.write_parquet(path_lender, compression="snappy")
         log(f"lender_names.parquet     ? {os.path.getsize(path_lender)/1e6:.1f} MB", "OK")
 
     # ?? E: External overlays ??????????????????????????????????????????
-    path_ext = f"{OUTPUT_DIR}/external_overlays.csv"
+    path_ext = f"{OUTPUT_CSV_DIR}/external_overlays.csv"
     pl.DataFrame(EXTERNAL_DATA).write_csv(path_ext)
     log(f"external_overlays.csv    ? {os.path.getsize(path_ext)} bytes", "OK")
 
@@ -851,7 +856,7 @@ def run_pipeline():
         .filter(pl.col("n_loans") >= 10)
         .sort(["msa_md", "as_of_year"])
     )
-    path_msa = f"{OUTPUT_DIR}/msa_scissor.parquet"
+    path_msa = f"{OUTPUT_PARQUET_DIR}/msa_scissor.parquet"
     msa_scissor.write_parquet(path_msa)
     log(f"msa_scissor.parquet      ? {os.path.getsize(path_msa)/1024:.0f} KB  ({len(msa_scissor):,} rows)", "OK")
 
@@ -870,7 +875,7 @@ def run_pipeline():
     print(f"\n  {'File':<38} {'Size':>8}  Serves")
     print(f"  {'-'*38} {'-'*8}  {'-'*25}")
     for fname, serves in manifest:
-        fpath = f"{OUTPUT_DIR}/{fname}"
+        fpath = f"{OUTPUT_PARQUET_DIR}/{fname}" if fname.endswith(".parquet") else f"{OUTPUT_CSV_DIR}/{fname}"
         if os.path.exists(fpath):
             mb = os.path.getsize(fpath) / 1e6
             total_mb += mb
@@ -883,7 +888,8 @@ def run_pipeline():
         print(f"  Retention rate        : {total_kept / total_raw * 100:.1f}%")
     if failed_years:
         print(f"\n  Failed/skipped years  : {sorted(failed_years)}")
-    print(f"\n  Output : {os.path.abspath(OUTPUT_DIR)}/\n")
+    print(f"\n  Output parquet : {os.path.abspath(OUTPUT_PARQUET_DIR)}/")
+    print(f"  Output csv     : {os.path.abspath(OUTPUT_CSV_DIR)}/\n")
 
 
 # ?????????????????????????????????????????????????????????????????????????????
@@ -892,7 +898,7 @@ def run_pipeline():
 
 def verify():
     log("VERIFICATION", "HEAD")
-    agg = pl.read_parquet(f"{OUTPUT_DIR}/hmda_aggregates.parquet")
+    agg = pl.read_parquet(f"{OUTPUT_PARQUET_DIR}/hmda_aggregates.parquet")
     log(f"Aggregates : {len(agg):,} rows, {agg.width} cols")
     log(f"Columns    : {agg.columns}")
 
@@ -915,11 +921,11 @@ def verify():
         .to_pandas().to_string(index=False)
     )
 
-    rvs = pl.read_parquet(f"{OUTPUT_DIR}/rvs_by_state.parquet")
+    rvs = pl.read_parquet(f"{OUTPUT_PARQUET_DIR}/rvs_by_state.parquet")
     print("\n  Recovery Velocity Score:")
     print(rvs.to_pandas().to_string(index=False))
 
-    sample = pl.read_parquet(f"{OUTPUT_DIR}/hmda_sample.parquet")
+    sample = pl.read_parquet(f"{OUTPUT_PARQUET_DIR}/hmda_sample.parquet")
     log(f"Sample : {len(sample):,} rows")
     print("\n  Median LTI ratio by year:")
     print(

@@ -6,10 +6,11 @@ from pathlib import Path
 import polars as pl
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "hmda_output"
+PARQUET_DIR = PROJECT_ROOT / "data" / "processed" / "parquet"
+CSV_DIR = PROJECT_ROOT / "data" / "processed" / "csv"
 
-agg = pl.read_parquet(str(DATA_DIR / "hmda_aggregates.parquet"))
-rvs = pl.read_parquet(str(DATA_DIR / "rvs_by_state.parquet"))
+agg = pl.read_parquet(str(PARQUET_DIR / "hmda_aggregates.parquet"))
+rvs = pl.read_parquet(str(PARQUET_DIR / "rvs_by_state.parquet"))
 
 # Column names in rvs_by_state: state, first_recovery_year, rvs_years
 print("=== RVS States ===")
@@ -92,7 +93,7 @@ print(data.sort("rvs_years_from_trough", descending=True).head(3).select(
 ))
 
 # Save for chart
-out_dir = DATA_DIR / "csv_exports"
+out_dir = CSV_DIR
 out_dir.mkdir(parents=True, exist_ok=True)
 analysis.write_csv(str(out_dir / "fha_recovery_analysis.csv"))
 print(f"\nSaved: {out_dir / 'fha_recovery_analysis.csv'}")
