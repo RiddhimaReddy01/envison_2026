@@ -20,6 +20,7 @@ import pandas as pd
 _COUNTRIES: List[Tuple[str, str, str]] = [
     ("USA", "United States", "Housing and financial contagion"),
     ("ISL", "Iceland", "Banking-system collapse"),
+    ("ESP", "Spain", "Housing and banking stress"),
     ("GRC", "Greece", "Sovereign-debt stress"),
     ("JPN", "Japan", "Trade and demand shock"),
     ("CHN", "China", "Export and external-demand shock"),
@@ -58,6 +59,17 @@ def _backup_frame() -> pd.DataFrame:
             "unemployment_peak_year": 2010,
             "unemployment_change_peak": 5.3,
             "export_growth_2009": -8.8,
+        },
+        {
+            "country_code": "ESP",
+            "country": "Spain",
+            "crisis_channel": "Housing and banking stress",
+            "gdp_growth_2009": -3.8,
+            "unemployment_2007": 8.2,
+            "unemployment_peak": 21.4,
+            "unemployment_peak_year": 2011,
+            "unemployment_change_peak": 13.2,
+            "export_growth_2009": -11.1,
         },
         {
             "country_code": "GRC",
@@ -175,6 +187,47 @@ def _canonicalize(df: pd.DataFrame) -> pd.DataFrame:
         if c not in out.columns:
             out[c] = pd.NA
     out = out[need_cols]
+
+    # Ensure every configured country is present even if cache/API payload is stale.
+    backup = _backup_frame().set_index("country_code")
+    configured = {code: (name, channel) for code, name, channel in _COUNTRIES}
+
+    if "country_code" in out.columns:
+        out = out.drop_duplicates(subset=["country_code"], keep="first")
+        existing = set(out["country_code"].astype(str).tolist())
+    else:
+        existing = set()
+
+    missing_rows = []
+    for code, (name, channel) in configured.items():
+        if code in existing:
+            continue
+        if code in backup.index:
+            row = backup.loc[code].to_dict()
+            row["country_code"] = code
+            missing_rows.append({c: row.get(c, pd.NA) for c in need_cols})
+        else:
+            missing_rows.append({
+                "country_code": code,
+                "country": name,
+                "crisis_channel": channel,
+                "gdp_growth_2009": pd.NA,
+                "unemployment_2007": pd.NA,
+                "unemployment_peak": pd.NA,
+                "unemployment_peak_year": pd.NA,
+                "unemployment_change_peak": pd.NA,
+                "export_growth_2009": pd.NA,
+            })
+
+    if missing_rows:
+        out = pd.concat([out, pd.DataFrame(missing_rows)], ignore_index=True)
+
+    # Fill key identity fields from configured mapping if missing.
+    for code, (name, channel) in configured.items():
+        m = out["country_code"] == code
+        out.loc[m & out["country"].isna(), "country"] = name
+        out.loc[m & out["crisis_channel"].isna(), "crisis_channel"] = channel
+
     out = out.sort_values("gdp_growth_2009", ascending=True, na_position="last")
     out = out.reset_index(drop=True)
     return out
@@ -197,4 +250,3 @@ def load_global_shockwave_summary() -> Tuple[pd.DataFrame, str]:
 
     # Finally fallback snapshot.
     return _canonicalize(_backup_frame()), "backup"
-

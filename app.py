@@ -251,6 +251,24 @@ def _ch8_pack():
 def _df_global_shockwave():
     return wb.load_global_shockwave_summary()
 
+@lru_cache(maxsize=1)
+def _ch9_pack():
+    df_global, source = _df_global_shockwave()
+    df = df_global.copy()
+
+    worst_gdp = df.loc[df["gdp_growth_2009"].idxmin()] if not df.empty and df["gdp_growth_2009"].notna().any() else None
+    largest_jobs = df.loc[df["unemployment_change_peak"].idxmax()] if not df.empty and df["unemployment_change_peak"].notna().any() else None
+    export_worst_pool = df[df["export_growth_2009"].notna()]
+    export_worst = export_worst_pool.loc[export_worst_pool["export_growth_2009"].idxmin()] if not export_worst_pool.empty else None
+
+    return {
+        "df_global": df,
+        "source": source,
+        "worst_gdp": worst_gdp,
+        "largest_jobs": largest_jobs,
+        "export_worst": export_worst,
+    }
+
 def card(children, pad="24px 28px", mb="16px"):
     return html.Div(children, className="card-soft", style={
         "background":C["bg"],"border":f"0.5px solid {C['border']}",
@@ -985,13 +1003,12 @@ def p8(mode):
     ])
 
 def p9(mode):
-    df_global, source = _df_global_shockwave()
-    df_global = df_global.copy()
-
-    worst_gdp = df_global.loc[df_global["gdp_growth_2009"].idxmin()] if not df_global.empty and df_global["gdp_growth_2009"].notna().any() else None
-    largest_jobs = df_global.loc[df_global["unemployment_change_peak"].idxmax()] if not df_global.empty and df_global["unemployment_change_peak"].notna().any() else None
-    export_worst = df_global[df_global["export_growth_2009"].notna()]
-    export_worst = export_worst.loc[export_worst["export_growth_2009"].idxmin()] if not export_worst.empty else None
+    pack = _ch9_pack()
+    df_global = pack["df_global"]
+    source = pack["source"]
+    worst_gdp = pack["worst_gdp"]
+    largest_jobs = pack["largest_jobs"]
+    export_worst = pack["export_worst"]
 
     return html.Div([
         chapter_title(9, "The Global Shockwave", "How the 2008 crisis propagated across economies through different channels."),
