@@ -2486,7 +2486,7 @@ def fig_ch6_funnel_compare(df_denial: pd.DataFrame, df_loan: pd.DataFrame, year:
         lt["approved_flow"] = approved * lt["share_norm"]
         return race, band, approved, denied, conv, lt
 
-    left = profile_data("White|100-150K")
+    left = profile_data("White|<50K")
     right = profile_data("Black / African American|<50K")
     if left is None or right is None:
         return fig
@@ -3854,4 +3854,3 @@ def fig_ch9_unemployment_shock(df: pd.DataFrame) -> go.Figure:
         hoverlabel=dict(bgcolor="rgba(255,255,255,0.98)", bordercolor=C["border"], font=dict(color="#111111", family=FONT, size=11)),
     ))
     return fig
-
