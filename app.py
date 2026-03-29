@@ -1,5 +1,5 @@
 ﻿"""
-app.py â€” Envision Hackathon 2026  (FINAL)
+app.py - Envision Hackathon 2026  (FINAL)
 ==========================================
 Post-Crisis Lending Landscape: A Documentary in Data
 
@@ -22,6 +22,7 @@ import pandas as pd
 
 import data_loader as dl
 import charts as ch
+import world_bank_data as wb
 
 C = {
     "bg":"#F7F5F0",
@@ -115,6 +116,141 @@ def _df_recovery_affordability():
 def _df_recovery_drivers():
     return dl.recovery_drivers_state().to_pandas()
 
+@lru_cache(maxsize=1)
+def _ch5_pack():
+    df_rvs = _df_rvs_scores()
+    df_bn = _df_bank_nonbank()
+    df_ra = _df_recovery_affordability()
+    df_drv = _df_recovery_drivers()
+
+    fast = int((df_rvs["rvs_years"] <= 2).sum()) if not df_rvs.empty else 0
+    slow = int((df_rvs["rvs_years"] >= 5).sum()) if not df_rvs.empty else 0
+    min_years = int(df_rvs["rvs_years"].min()) if not df_rvs.empty else 0
+    max_years = int(df_rvs["rvs_years"].max()) if not df_rvs.empty else 0
+
+    bank_share_2007 = float(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2007)]["share"].iloc[0]) if not df_bn.empty and len(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2007)]) else 0.0
+    bank_share_2017 = float(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]["share"].iloc[0]) if not df_bn.empty and len(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]) else 0.0
+    nonbank_share_2007 = 1.0 - bank_share_2007
+    nonbank_share_2017 = 1.0 - bank_share_2017
+
+    fast_lti = float(df_ra[df_ra["rvs_years"] <= 2]["median_lti_2017"].mean()) if not df_ra.empty and len(df_ra[df_ra["rvs_years"] <= 2]) else 0.0
+    slow_lti = float(df_ra[df_ra["rvs_years"] >= 5]["median_lti_2017"].mean()) if not df_ra.empty and len(df_ra[df_ra["rvs_years"] >= 5]) else 0.0
+    df_map = df_rvs.merge(df_ra[["state", "median_lti_2017"]], on="state", how="left") if (not df_rvs.empty and not df_ra.empty) else df_rvs
+
+    return {
+        "df_rvs": df_rvs,
+        "df_bn": df_bn,
+        "df_ra": df_ra,
+        "df_drv": df_drv,
+        "df_map": df_map,
+        "fast": fast,
+        "slow": slow,
+        "min_years": min_years,
+        "max_years": max_years,
+        "nonbank_share_2007": nonbank_share_2007,
+        "nonbank_share_2017": nonbank_share_2017,
+        "fast_lti": fast_lti,
+        "slow_lti": slow_lti,
+    }
+
+@lru_cache(maxsize=1)
+def _ch6_pack():
+    df_dr = _df_denial_rates()
+    df_age = _df_homeownership_age()
+    df_ho = _df_purchase_homeownership()
+    df_col = _df_collapse()
+    df_loan = _df_loan_type_share()
+
+    white_low = df_dr[(df_dr["race"] == "White") & (df_dr["income_band"] == "<50K")].sort_values("year") if not df_dr.empty else pd.DataFrame()
+    black_low = df_dr[(df_dr["race"] == "Black / African American") & (df_dr["income_band"] == "<50K")].sort_values("year") if not df_dr.empty else pd.DataFrame()
+    post_w = float(white_low[white_low["year"] >= 2012]["denial_rate"].mean()) if not white_low.empty else 0.0
+    post_b = float(black_low[black_low["year"] >= 2012]["denial_rate"].mean()) if not black_low.empty else 0.0
+    gap_pp = (post_b - post_w) * 100.0
+    ratio = (post_b / post_w) if post_w > 0 else 0.0
+    h2007 = float(df_ho[df_ho["year"] == 2007]["homeownership_rate"].iloc[0]) if len(df_ho[df_ho["year"] == 2007]) else 0.0
+    h2017 = float(df_ho[df_ho["year"] == 2017]["homeownership_rate"].iloc[0]) if len(df_ho[df_ho["year"] == 2017]) else 0.0
+
+    return {
+        "df_dr": df_dr,
+        "df_age": df_age,
+        "df_ho": df_ho,
+        "df_col": df_col,
+        "df_loan": df_loan,
+        "post_w": post_w,
+        "post_b": post_b,
+        "gap_pp": gap_pp,
+        "ratio": ratio,
+        "h2007": h2007,
+        "h2017": h2017,
+    }
+
+@lru_cache(maxsize=1)
+def _ch8_pack():
+    lt = _df_loan_type_share()
+    pr = _df_purchase_refi()
+    dr = _df_denial_rates()
+
+    top_share_2007 = 0.0
+    if not lt.empty and {"year", "share"}.issubset(set(lt.columns)):
+        s07 = lt[lt["year"] == 2007]
+        if len(s07):
+            top_share_2007 = float(s07["share"].max())
+
+    decoupling_gap_idx = 0.0
+    if not pr.empty and {"year", "purchase", "refinance"}.issubset(set(pr.columns)):
+        x = pr[["year", "purchase", "refinance"]].copy().sort_values("year")
+        b = x[x["year"] == 2007]
+        if len(b):
+            bp = float(b["purchase"].iloc[0])
+            br = float(b["refinance"].iloc[0])
+        else:
+            bp = float(x["purchase"].iloc[0]) if len(x) else 0.0
+            br = float(x["refinance"].iloc[0]) if len(x) else 0.0
+        if bp > 0 and br > 0 and len(x):
+            x["purchase_idx"] = (x["purchase"] / bp) * 100.0
+            x["refi_idx"] = (x["refinance"] / br) * 100.0
+            decoupling_gap_idx = float((x["refi_idx"] - x["purchase_idx"]).max())
+
+    denial_gap_pp = 0.0
+    if not dr.empty and {"year", "race", "income_band", "denial_rate"}.issubset(set(dr.columns)):
+        wl = dr[(dr["race"] == "White") & (dr["income_band"] == "<50K") & (dr["year"] >= 2012)]
+        bl = dr[(dr["race"] == "Black / African American") & (dr["income_band"] == "<50K") & (dr["year"] >= 2012)]
+        post_w = float(wl["denial_rate"].mean()) if len(wl) else 0.0
+        post_b = float(bl["denial_rate"].mean()) if len(bl) else 0.0
+        denial_gap_pp = (post_b - post_w) * 100.0
+
+    score = pd.DataFrame([
+        {
+            "lesson": "Channel diversification",
+            "current": top_share_2007 * 100.0,
+            "target": 70.0,
+            "direction": "lower_better",
+        },
+        {
+            "lesson": "Refi-purchase opportunity gap",
+            "current": decoupling_gap_idx,
+            "target": 30.0,
+            "direction": "lower_better",
+        },
+        {
+            "lesson": "Same-income denial disparity",
+            "current": denial_gap_pp,
+            "target": 10.0,
+            "direction": "lower_better",
+        },
+    ])
+
+    return {
+        "top_share_2007": top_share_2007,
+        "decoupling_gap_idx": decoupling_gap_idx,
+        "denial_gap_pp": denial_gap_pp,
+        "score": score,
+    }
+
+@lru_cache(maxsize=1)
+def _df_global_shockwave():
+    return wb.load_global_shockwave_summary()
+
 def card(children, pad="24px 28px", mb="16px"):
     return html.Div(children, className="card-soft", style={
         "background":C["bg"],"border":f"0.5px solid {C['border']}",
@@ -162,14 +298,7 @@ def chapter_title(num, title, subtitle):
         html.P(subtitle, style={"fontSize":FS_BODY,"color":C["muted"],"margin":"0 0 20px 38px"}),
     ])
 
-def ann(civilian, veteran, mode):
-    if mode == "veteran":
-        return html.Div([
-            html.Span("Veteran  ", style={"fontSize":"10px","fontWeight":"500",
-                "letterSpacing":"0.07em","textTransform":"uppercase","color":C["veteran"]}),
-            html.Span(veteran, style={"fontSize":FS_BODY,"color":C["muted"]}),
-        ], style={"padding":"10px 14px","borderRadius":"8px","marginTop":"12px",
-                  "background":"#EEEDFE08","border":"0.5px solid #534AB740"})
+def ann(civilian, veteran=None, mode=None):
     return html.Div(civilian, style={
         "padding":"10px 14px","borderRadius":"8px","marginTop":"12px",
         "fontSize":FS_BODY,"fontWeight":"500","color":C["civilian"],
@@ -215,6 +344,49 @@ def key_insight(text):
         ], pad="16px 20px")
     ], style={"borderTop": f"3px solid {C['warning']}", "marginTop":"24px", "borderRadius":"12px"})
 
+def _fmt_pct(value):
+    return "n/a" if value is None or value != value else f"{value:.1f}%"
+
+def _fmt_pp(value):
+    return "n/a" if value is None or value != value else f"{value:+.1f} pp"
+
+def _global_shockwave_source_note(source):
+    notes = {
+        "api": "World Bank API data fetched and cached locally for this page.",
+        "cache": "World Bank API data loaded from local cache to avoid repeated refresh calls.",
+        "backup": "World Bank API fetch was unavailable, so this page is using the built-in backup snapshot for the same countries and years.",
+    }
+    return notes.get(source, "World Bank source status unavailable.")
+
+def _global_shockwave_table(df):
+    header_style = {"textAlign":"left","fontSize":"10px","color":C["muted"],"padding":"0 8px 8px 0","borderBottom":f"0.5px solid {C['border']}"}
+    cell_style = {"padding":"10px 8px 10px 0","fontSize":"12px","color":C["text"],"borderBottom":"0.5px solid rgba(20,20,20,0.08)","verticalAlign":"top"}
+    rows = []
+    for row in df.itertuples(index=False):
+        peak_label = "n/a"
+        if row.unemployment_peak is not None and row.unemployment_peak == row.unemployment_peak and row.unemployment_peak_year:
+            peak_label = f"{row.unemployment_peak:.1f}% ({int(row.unemployment_peak_year)})"
+        rows.append(html.Tr([
+            html.Td(row.country, style=cell_style),
+            html.Td(_fmt_pct(row.gdp_growth_2009), style=cell_style),
+            html.Td(_fmt_pp(row.unemployment_change_peak), style=cell_style),
+            html.Td(peak_label, style=cell_style),
+            html.Td(_fmt_pct(row.export_growth_2009), style=cell_style),
+            html.Td(row.crisis_channel, style=cell_style),
+        ]))
+
+    return html.Table([
+        html.Thead(html.Tr([
+            html.Th("Country", style=header_style),
+            html.Th("GDP growth (2009)", style=header_style),
+            html.Th("Unemployment shock", style=header_style),
+            html.Th("Peak unemployment", style=header_style),
+            html.Th("Export growth (2009)", style=header_style),
+            html.Th("Main crisis channel", style=header_style),
+        ])),
+        html.Tbody(rows),
+    ], style={"width":"100%","borderCollapse":"collapse","tableLayout":"fixed"})
+
 def G(fig, gid="", keep_legend=False, keep_title=False):
     fig_out = go.Figure(fig)
     # Consistent contract: charts own legend behavior unless explicitly forced on.
@@ -228,7 +400,7 @@ def G(fig, gid="", keep_legend=False, keep_title=False):
                      style={"width":"100%"})
 
 CHAPTERS = [(1,"The Bet"),(2,"The Crash"),(3,"The Rescue"),
-            (4,"Fake Recovery"),(5,"Who Survived"),(6,"Left Behind"),(7,"New Rules"),(8,"Lessons")]
+            (4,"Fake Recovery"),(5,"Who Survived"),(6,"Left Behind"),(7,"New Rules"),(8,"Lessons"),(9,"Global Shockwave")]
 
 def navbar(active=1):
     return html.Div([
@@ -246,7 +418,15 @@ def navbar(active=1):
             }) for n,lbl in CHAPTERS
         ], style={"display":"flex","gap":"2px","alignItems":"center",
                   "flex":"1","flexWrap":"wrap","justifyContent":"center"}),
-        html.Div([], style={"display":"flex","alignItems":"center","flex":"0 0 auto"}),
+        html.Div([
+            html.A("Export PDF", href="/export/print", style={
+                "padding":"7px 12px","borderRadius":"8px","fontSize":"12px",
+                "textDecoration":"none","whiteSpace":"nowrap","fontWeight":"600",
+                "color":"white","background":C["civilian"],
+                "border":"0.5px solid rgba(15,90,122,0.45)",
+                "boxShadow":"0 4px 12px rgba(15,90,122,0.16)",
+            }),
+        ], style={"display":"flex","alignItems":"center","flex":"0 0 auto"}),
     ], style={"display":"flex","alignItems":"center","gap":"16px","padding":"10px 28px",
               "background":C["bg"],"borderBottom":f"0.5px solid {C['border']}",
               "position":"sticky","top":"0","zIndex":"100","fontFamily":FONT})
@@ -462,25 +642,20 @@ def p4(mode):
         ]),
     ])
 def p5(mode):
-    df_rvs  = _df_rvs_scores()
-    df_bn   = _df_bank_nonbank()
-    df_ra   = _df_recovery_affordability()
-    df_drv  = _df_recovery_drivers()
-
-    fast      = int((df_rvs["rvs_years"] <= 2).sum()) if not df_rvs.empty else 0
-    slow      = int((df_rvs["rvs_years"] >= 5).sum()) if not df_rvs.empty else 0
-    min_years = int(df_rvs["rvs_years"].min()) if not df_rvs.empty else 0
-    max_years = int(df_rvs["rvs_years"].max()) if not df_rvs.empty else 0
-
-    # Bank vs nonbank crossover year
-    bank_share_2007 = float(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2007)]["share"].iloc[0]) if not df_bn.empty and len(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2007)]) else 0.0
-    bank_share_2017 = float(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]["share"].iloc[0]) if not df_bn.empty and len(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]) else 0.0
-    nonbank_share_2007 = 1.0 - bank_share_2007
-    nonbank_share_2017 = 1.0 - bank_share_2017
-
-    # Recovery trap insight
-    fast_lti = float(df_ra[df_ra["rvs_years"] <= 2]["median_lti_2017"].mean()) if not df_ra.empty and len(df_ra[df_ra["rvs_years"] <= 2]) else 0.0
-    slow_lti = float(df_ra[df_ra["rvs_years"] >= 5]["median_lti_2017"].mean()) if not df_ra.empty and len(df_ra[df_ra["rvs_years"] >= 5]) else 0.0
+    pack = _ch5_pack()
+    df_rvs = pack["df_rvs"]
+    df_bn = pack["df_bn"]
+    df_ra = pack["df_ra"]
+    df_drv = pack["df_drv"]
+    df_map = pack["df_map"]
+    fast = pack["fast"]
+    slow = pack["slow"]
+    min_years = pack["min_years"]
+    max_years = pack["max_years"]
+    nonbank_share_2007 = pack["nonbank_share_2007"]
+    nonbank_share_2017 = pack["nonbank_share_2017"]
+    fast_lti = pack["fast_lti"]
+    slow_lti = pack["slow_lti"]
 
     return html.Div([
         chapter_title(5, "Who Survived — And What It Cost Them",
@@ -505,7 +680,7 @@ def p5(mode):
                      style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
             html.Div("Recovery speed varied sharply by state, creating early winners and long-delay markets.",
                      style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
-            G(ch.fig_recovery_map_discrete(df_rvs.merge(df_ra[["state", "median_lti_2017"]], on="state", how="left") if (not df_rvs.empty and not df_ra.empty) else df_rvs), "ch5-map"),
+            G(ch.fig_recovery_map_discrete(df_map), "ch5-map"),
             ann("Geography determined survival speed. Oil-state and sun-belt markets bounced back in 1–2 years. "
                 "Sand states — Nevada, Arizona, Florida — took 3–7 years.",
                 "RVS = years from trough (2009) to first year originations exceed 80% of 2007 baseline. "
@@ -558,19 +733,18 @@ def p5(mode):
     ])
 
 def p6(mode):
-    df_dr = _df_denial_rates()
-    df_age = _df_homeownership_age()
-    df_ho = _df_purchase_homeownership()
-    df_col = _df_collapse()
-
-    white_low = df_dr[(df_dr["race"] == "White") & (df_dr["income_band"] == "<50K")].sort_values("year")
-    black_low = df_dr[(df_dr["race"] == "Black / African American") & (df_dr["income_band"] == "<50K")].sort_values("year")
-    post_w = float(white_low[white_low["year"] >= 2012]["denial_rate"].mean()) if not white_low.empty else 0.0
-    post_b = float(black_low[black_low["year"] >= 2012]["denial_rate"].mean()) if not black_low.empty else 0.0
-    gap_pp = (post_b - post_w) * 100.0
-    ratio = (post_b / post_w) if post_w > 0 else 0.0
-    h2007 = float(df_ho[df_ho["year"] == 2007]["homeownership_rate"].iloc[0]) if len(df_ho[df_ho["year"] == 2007]) else 0.0
-    h2017 = float(df_ho[df_ho["year"] == 2017]["homeownership_rate"].iloc[0]) if len(df_ho[df_ho["year"] == 2017]) else 0.0
+    pack = _ch6_pack()
+    df_dr = pack["df_dr"]
+    df_age = pack["df_age"]
+    df_ho = pack["df_ho"]
+    df_col = pack["df_col"]
+    df_loan = pack["df_loan"]
+    post_w = pack["post_w"]
+    post_b = pack["post_b"]
+    gap_pp = pack["gap_pp"]
+    ratio = pack["ratio"]
+    h2007 = pack["h2007"]
+    h2017 = pack["h2017"]
 
     return html.Div([
         chapter_title(6, "Who Got Left Behind", "The recovery was K-shaped: access improved for some and stayed constrained for others."),
@@ -598,7 +772,7 @@ def p6(mode):
                      style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
             html.Div("At the same period endpoint, low-income applicants lose a larger share before origination.",
                      style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
-            G(ch.fig_ch6_funnel_compare(df_dr, _df_loan_type_share(), 2017), "ch6-sankey"),
+            G(ch.fig_ch6_funnel_compare(df_dr, df_loan, 2017), "ch6-sankey"),
             ann(
                 "The leakage is structural: lower-income households convert from application to origination at much lower rates.",
                 "Conversion rate is shown directly on each funnel to quantify the disparity.",
@@ -763,63 +937,11 @@ def p7(mode):
     ])
 
 def p8(mode):
-    lt = _df_loan_type_share()
-    pr = _df_purchase_refi()
-    dr = _df_denial_rates()
-
-    # Lesson KPI 1: concentration risk (top channel share in 2007)
-    top_share_2007 = 0.0
-    if not lt.empty and {"year", "share"}.issubset(set(lt.columns)):
-        s07 = lt[lt["year"] == 2007]
-        if len(s07):
-            top_share_2007 = float(s07["share"].max())
-
-    # Lesson KPI 2: decoupling severity (max refi idx - purchase idx)
-    decoupling_gap_idx = 0.0
-    if not pr.empty and {"year", "purchase", "refinance"}.issubset(set(pr.columns)):
-        x = pr[["year", "purchase", "refinance"]].copy().sort_values("year")
-        b = x[x["year"] == 2007]
-        if len(b):
-            bp = float(b["purchase"].iloc[0])
-            br = float(b["refinance"].iloc[0])
-        else:
-            bp = float(x["purchase"].iloc[0]) if len(x) else 0.0
-            br = float(x["refinance"].iloc[0]) if len(x) else 0.0
-        if bp > 0 and br > 0 and len(x):
-            x["purchase_idx"] = (x["purchase"] / bp) * 100.0
-            x["refi_idx"] = (x["refinance"] / br) * 100.0
-            decoupling_gap_idx = float((x["refi_idx"] - x["purchase_idx"]).max())
-
-    # Lesson KPI 3: persistent denial disparity (post-2012, low-income)
-    denial_gap_pp = 0.0
-    if not dr.empty and {"year", "race", "income_band", "denial_rate"}.issubset(set(dr.columns)):
-        wl = dr[(dr["race"] == "White") & (dr["income_band"] == "<50K") & (dr["year"] >= 2012)]
-        bl = dr[(dr["race"] == "Black / African American") & (dr["income_band"] == "<50K") & (dr["year"] >= 2012)]
-        post_w = float(wl["denial_rate"].mean()) if len(wl) else 0.0
-        post_b = float(bl["denial_rate"].mean()) if len(bl) else 0.0
-        denial_gap_pp = (post_b - post_w) * 100.0
-
-    # Goal-oriented scorecard (targets are directional policy guardrails).
-    score = pd.DataFrame([
-        {
-            "lesson": "Channel diversification",
-            "current": top_share_2007 * 100.0,
-            "target": 70.0,  # no single channel above 70%
-            "direction": "lower_better",
-        },
-        {
-            "lesson": "Refi-purchase opportunity gap",
-            "current": decoupling_gap_idx,
-            "target": 30.0,
-            "direction": "lower_better",
-        },
-        {
-            "lesson": "Same-income denial disparity",
-            "current": denial_gap_pp,
-            "target": 10.0,
-            "direction": "lower_better",
-        },
-    ])
+    pack = _ch8_pack()
+    top_share_2007 = pack["top_share_2007"]
+    decoupling_gap_idx = pack["decoupling_gap_idx"]
+    denial_gap_pp = pack["denial_gap_pp"]
+    score = pack["score"]
 
     return html.Div([
         chapter_title(8, "Lessons for the Next Cycle", "Build resilience without rebuilding exclusion."),
@@ -862,6 +984,111 @@ def p8(mode):
         ]),
     ])
 
+def p9(mode):
+    df_global, source = _df_global_shockwave()
+    df_global = df_global.copy()
+
+    worst_gdp = df_global.loc[df_global["gdp_growth_2009"].idxmin()] if not df_global.empty and df_global["gdp_growth_2009"].notna().any() else None
+    largest_jobs = df_global.loc[df_global["unemployment_change_peak"].idxmax()] if not df_global.empty and df_global["unemployment_change_peak"].notna().any() else None
+    export_worst = df_global[df_global["export_growth_2009"].notna()]
+    export_worst = export_worst.loc[export_worst["export_growth_2009"].idxmin()] if not export_worst.empty else None
+
+    return html.Div([
+        chapter_title(9, "The Global Shockwave", "How the 2008 crisis propagated across economies through different channels."),
+        data_note(_global_shockwave_source_note(source)),
+        kpi_row([
+            kpi(_fmt_pct(worst_gdp["gdp_growth_2009"]) if worst_gdp is not None else "n/a", f"Deepest GDP hit: {worst_gdp['country']}" if worst_gdp is not None else "Deepest GDP hit", C["crash"], "2009 growth rate"),
+            kpi(_fmt_pp(largest_jobs["unemployment_change_peak"]) if largest_jobs is not None else "n/a", f"Largest labor shock: {largest_jobs['country']}" if largest_jobs is not None else "Largest labor shock", C["warning"], "Rise from 2007 to peak"),
+            kpi(_fmt_pct(export_worst["export_growth_2009"]) if export_worst is not None else "n/a", f"Worst export collapse: {export_worst['country']}" if export_worst is not None else "Worst export collapse", C["govt"], "2009 export growth"),
+        ]),
+        insight_chip("The same crisis moved through different channels: housing and finance in the U.S., banking stress in Iceland, debt stress in Greece, and trade shocks in export-linked economies.", C["govt"]),
+        card([
+            html.Div("Country snapshot (2007-2011)", style={"fontSize":"13px","fontWeight":"500","marginBottom":"10px"}),
+            html.Div(_global_shockwave_table(df_global), style={"overflowX":"auto"}),
+            html.Div("Note: Some country-year series may be missing from the World Bank pull; the table leaves those cells as n/a.", style={"fontSize":"11px","color":C["muted"],"marginTop":"10px"}),
+        ]),
+        html.Div([
+            html.Div([
+                card([
+                    html.Div("Output shock vs trade shock", style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+                    G(ch.fig_ch9_growth_exports(df_global), "ch9-growth-exports"),
+                ], mb="0"),
+            ], style={"flex":"1.2","minWidth":"360px"}),
+            html.Div([
+                card([
+                    html.Div("Where labor-market pain peaked", style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+                    G(ch.fig_ch9_unemployment_shock(df_global), "ch9-unemployment"),
+                ], mb="0"),
+            ], style={"flex":"0.9","minWidth":"320px"}),
+        ], style={"display":"flex","gap":"12px","flexWrap":"wrap","alignItems":"stretch"}),
+        card([
+            html.Div("Final takeaway", style={"fontSize":"11px","fontWeight":"700","letterSpacing":"0.06em","textTransform":"uppercase","color":C["warning"],"marginBottom":"8px"}),
+            html.Div(
+                "The crisis was global, but not uniform. Financially concentrated economies were hit early, trade-linked economies absorbed external demand shocks, and labor-market scars lasted beyond the initial panic.",
+                style={"fontSize":"15px","fontWeight":"500","fontStyle":"italic","lineHeight":"1.6","color":C["text"]},
+            ),
+        ], pad="18px 22px"),
+    ])
+
+def export_print_view():
+    sections = [
+        p1("civilian"),
+        p2("civilian"),
+        p3("civilian"),
+        p4("civilian"),
+        p5("civilian"),
+        p6("civilian"),
+        p7("civilian"),
+        p8("civilian"),
+        p9("civilian"),
+    ]
+
+    wrappers = []
+    for idx, section in enumerate(sections, start=1):
+        wrappers.append(html.Div(
+            section,
+            style={
+                "background":"white",
+                "border":"0.5px solid rgba(20,20,20,0.12)",
+                "borderRadius":"16px",
+                "padding":"24px 28px",
+                "marginBottom":"20px",
+                "pageBreakAfter":"always" if idx < len(sections) else "auto",
+                "breakAfter":"page" if idx < len(sections) else "auto",
+                "boxShadow":"0 10px 24px rgba(20,20,20,0.04)",
+            },
+        ))
+
+    return html.Div([
+        html.Div([
+            html.Div("Export All 9 Chapters", style={"fontSize":"20px","fontWeight":"700","fontFamily":FONT_SERIF,"marginBottom":"6px"}),
+            html.Div("Use the button below, then choose Save as PDF in the browser print dialog. The export page is optimized for one continuous local PDF.", style={"fontSize":"13px","color":C["muted"],"lineHeight":"1.6","marginBottom":"14px"}),
+            html.Div([
+                html.Button("Print / Save as PDF", id="print-pdf-btn", n_clicks=0, style={
+                    "padding":"9px 14px","borderRadius":"10px","fontSize":"13px","fontWeight":"700",
+                    "border":"0.5px solid rgba(15,90,122,0.35)","background":C["civilian"],"color":"white",
+                    "cursor":"pointer",
+                }),
+                dcc.Link("Back to app", href="/chapter/1", style={
+                    "padding":"9px 14px","borderRadius":"10px","fontSize":"13px","fontWeight":"600",
+                    "textDecoration":"none","border":f"0.5px solid {C['border']}",
+                    "color":C["text"],"background":"white",
+                }),
+            ], style={"display":"flex","gap":"10px","flexWrap":"wrap"}),
+            html.Div(id="print-pdf-dummy", style={"display":"none"}),
+        ], style={
+            "background":"rgba(255,255,255,0.92)",
+            "border":"0.5px solid rgba(20,20,20,0.12)",
+            "borderRadius":"16px",
+            "padding":"20px 24px",
+            "marginBottom":"18px",
+            "position":"sticky",
+            "top":"10px",
+            "zIndex":"10",
+        }),
+        *wrappers,
+    ], style={"maxWidth":"1120px","margin":"0 auto","padding":"20px 24px 36px","fontFamily":FONT,"color":C["text"]})
+
 # â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.layout = html.Div([
@@ -881,12 +1108,19 @@ app.layout = html.Div([
 
 PAGE_MAP = {
     "/chapter/1":(p1,1),"/chapter/2":(p2,2),"/chapter/3":(p3,3),
-    "/chapter/4":(p4,4),"/chapter/5":(p5,5),"/chapter/6":(p6,6),"/chapter/7":(p7,7),"/chapter/8":(p8,8),
+    "/chapter/4":(p4,4),"/chapter/5":(p5,5),"/chapter/6":(p6,6),"/chapter/7":(p7,7),"/chapter/8":(p8,8),"/chapter/9":(p9,9),
 }
 
-def _render_page(path: str):
+@lru_cache(maxsize=16)
+def _render_page_cached(path: str):
+    if path == "/export/print":
+        return export_print_view()
     fn, _ = PAGE_MAP.get(path,(p1,1))
     return fn("civilian")
+
+def _render_page(path: str):
+    # Page-level cache avoids rebuilding the same chart tree on repeated navigation.
+    return _render_page_cached(path)
 
 @app.callback(Output("page","children"), Input("url","pathname"))
 def route(path):
@@ -902,15 +1136,26 @@ def route(path):
 
 @app.callback(Output("nav","children"), Input("url","pathname"))
 def render_nav(path):
+    if path == "/export/print":
+        return html.Div()
     _, num = PAGE_MAP.get(path, (p1, 1))
     return navbar(num)
+
+app.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks) { return ""; }
+        window.print();
+        return "";
+    }
+    """,
+    Output("print-pdf-dummy", "children"),
+    Input("print-pdf-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
 
 
 if __name__ == "__main__":
     print(f"Mode: {'REAL' if dl.USE_REAL_DATA else 'MOCK'} DATA")
     print("Open: http://127.0.0.1:8050")
     app.run(debug=False, port=8050)
-
-
-
-
