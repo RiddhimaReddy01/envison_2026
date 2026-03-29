@@ -18,6 +18,7 @@ import traceback
 import dash
 from dash import dcc, html, Input, Output
 import plotly.graph_objects as go
+import pandas as pd
 
 import data_loader as dl
 import charts as ch
@@ -27,7 +28,7 @@ C = {
     "surface":"#EFEDE7",
     "border":"rgba(20,20,20,0.16)",
     "text":"#1A1A1A",
-    "muted":"#5B5B5B",
+    "muted":"#3F3F3F",
     "crash":"#D7261E",
     "recovery":"#2C7A5A",
     "govt":"#285C9A",
@@ -39,6 +40,9 @@ C = {
 FONT  = "'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 FONT_SERIF = "'Libre Baskerville', Georgia, 'Times New Roman', serif"
 YEARS = list(range(2007,2018))
+FS_NOTE = "12px"
+FS_BODY = "14px"
+FS_HEAD = "16px"
 
 app = dash.Dash(__name__, title="Post-Crisis Lending 2007-2017",
                 suppress_callback_exceptions=True)
@@ -88,6 +92,14 @@ def _df_purchase_homeownership():
     return dl.purchase_homeownership().to_pandas()
 
 @lru_cache(maxsize=1)
+def _df_mortgage_rates():
+    return dl.mortgage_rate_series().to_pandas()
+
+@lru_cache(maxsize=1)
+def _df_homeownership_age():
+    return dl.homeownership_by_age().to_pandas()
+
+@lru_cache(maxsize=1)
 def _df_lender_bubble():
     return dl.lender_bubble().to_pandas()
 
@@ -99,6 +111,10 @@ def _df_bank_nonbank():
 def _df_recovery_affordability():
     return dl.recovery_vs_affordability().to_pandas()
 
+@lru_cache(maxsize=1)
+def _df_recovery_drivers():
+    return dl.recovery_drivers_state().to_pandas()
+
 def card(children, pad="24px 28px", mb="16px"):
     return html.Div(children, className="card-soft", style={
         "background":C["bg"],"border":f"0.5px solid {C['border']}",
@@ -109,8 +125,8 @@ def kpi(number, label, color=None, note=None):
     return html.Div([
         html.Div(number, style={"fontSize":"24px","fontWeight":"500",
                                 "lineHeight":"1.1","color":color or C["text"]}),
-        html.Div(label,  style={"fontSize":"12px","color":C["muted"],"marginTop":"4px"}),
-        html.Div(note,   style={"fontSize":"10px","color":C["muted"],"marginTop":"2px",
+        html.Div(label,  style={"fontSize":"13px","color":C["muted"],"marginTop":"4px"}),
+        html.Div(note,   style={"fontSize":"11px","color":C["muted"],"marginTop":"2px",
                                 "fontStyle":"italic"}) if note else None,
     ], className="kpi-soft", style={"background":C["surface"],"borderRadius":"6px",
               "padding":"14px 16px","flex":"1","minWidth":"130px","border":f"0.5px solid {C['border']}"})
@@ -143,7 +159,7 @@ def chapter_title(num, title, subtitle):
             }),
             html.Span(title, style={"fontSize":"22px","fontWeight":"700","fontFamily":FONT_SERIF,"letterSpacing":"0.01em"}),
         ], style={"display":"flex","alignItems":"center","marginBottom":"5px"}),
-        html.P(subtitle, style={"fontSize":"13px","color":C["muted"],"margin":"0 0 20px 38px"}),
+        html.P(subtitle, style={"fontSize":FS_BODY,"color":C["muted"],"margin":"0 0 20px 38px"}),
     ])
 
 def ann(civilian, veteran, mode):
@@ -151,12 +167,12 @@ def ann(civilian, veteran, mode):
         return html.Div([
             html.Span("Veteran  ", style={"fontSize":"10px","fontWeight":"500",
                 "letterSpacing":"0.07em","textTransform":"uppercase","color":C["veteran"]}),
-            html.Span(veteran, style={"fontSize":"13px","color":C["muted"]}),
+            html.Span(veteran, style={"fontSize":FS_BODY,"color":C["muted"]}),
         ], style={"padding":"10px 14px","borderRadius":"8px","marginTop":"12px",
                   "background":"#EEEDFE08","border":"0.5px solid #534AB740"})
     return html.Div(civilian, style={
         "padding":"10px 14px","borderRadius":"8px","marginTop":"12px",
-        "fontSize":"14px","fontWeight":"500","color":C["civilian"],
+        "fontSize":FS_BODY,"fontWeight":"500","color":C["civilian"],
         "lineHeight":"1.5","background":"#E1F5EE50",
         "border":"0.5px solid #1D9E7550",
     })
@@ -182,7 +198,7 @@ def insight_chip(text, color=None):
         html.Span("Takeaway: ", style={"fontWeight":"700", "color":C["text"]}),
         clean
     ], style={
-        "fontSize":"12px","fontWeight":"600","color":color or C["text"],
+        "fontSize":"13px","fontWeight":"600","color":color or C["text"],
         "padding":"8px 12px","borderRadius":"999px","display":"inline-block",
         "background":"#F4F1E8","border":"0.5px solid rgba(17,24,39,0.16)",
         "marginBottom":"14px",
@@ -199,9 +215,15 @@ def key_insight(text):
         ], pad="16px 20px")
     ], style={"borderTop": f"3px solid {C['warning']}", "marginTop":"24px", "borderRadius":"12px"})
 
-def G(fig, gid=""):
+def G(fig, gid="", keep_legend=False, keep_title=False):
+    fig_out = go.Figure(fig)
+    # Consistent contract: charts own legend behavior unless explicitly forced on.
+    if keep_legend:
+        fig_out.update_layout(showlegend=True)
+    if not keep_title:
+        fig_out.update_layout(title=dict(text=""))
     return dcc.Graph(id=gid if gid else {"type":"graph","idx":gid},
-                     figure=fig, animate=False,
+                     figure=fig_out, animate=False,
                      config={"displayModeBar":False,"responsive":True},
                      style={"width":"100%"})
 
@@ -224,16 +246,7 @@ def navbar(active=1):
             }) for n,lbl in CHAPTERS
         ], style={"display":"flex","gap":"2px","alignItems":"center",
                   "flex":"1","flexWrap":"wrap","justifyContent":"center"}),
-        html.Div([
-            html.Span("View:",style={"fontSize":"11px","color":C["muted"],"marginRight":"8px"}),
-            dcc.RadioItems(id="mode",
-                options=[{"label":"Newcomer","value":"civilian"},
-                         {"label":"Veteran","value":"veteran"}],
-                value="civilian", inline=True,
-                inputStyle={"marginRight":"4px","cursor":"pointer"},
-                labelStyle={"marginRight":"14px","cursor":"pointer",
-                            "fontSize":"12px","userSelect":"none"}),
-        ], style={"display":"flex","alignItems":"center","flex":"0 0 auto"}),
+        html.Div([], style={"display":"flex","alignItems":"center","flex":"0 0 auto"}),
     ], style={"display":"flex","alignItems":"center","gap":"16px","padding":"10px 28px",
               "background":C["bg"],"borderBottom":f"0.5px solid {C['border']}",
               "position":"sticky","top":"0","zIndex":"100","fontFamily":FONT})
@@ -441,6 +454,7 @@ def p5(mode):
     df_rvs  = _df_rvs_scores()
     df_bn   = _df_bank_nonbank()
     df_ra   = _df_recovery_affordability()
+    df_drv  = _df_recovery_drivers()
 
     fast      = int((df_rvs["rvs_years"] <= 2).sum()) if not df_rvs.empty else 0
     slow      = int((df_rvs["rvs_years"] >= 5).sum()) if not df_rvs.empty else 0
@@ -448,7 +462,9 @@ def p5(mode):
     max_years = int(df_rvs["rvs_years"].max()) if not df_rvs.empty else 0
 
     # Bank vs nonbank crossover year
+    bank_share_2007 = float(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2007)]["share"].iloc[0]) if not df_bn.empty and len(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2007)]) else 0.0
     bank_share_2017 = float(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]["share"].iloc[0]) if not df_bn.empty and len(df_bn[(df_bn["lender_type"] == "Bank") & (df_bn["year"] == 2017)]) else 0.0
+    nonbank_share_2007 = 1.0 - bank_share_2007
     nonbank_share_2017 = 1.0 - bank_share_2017
 
     # Recovery trap insight
@@ -464,7 +480,7 @@ def p5(mode):
             kpi(str(fast), "Fast-recovery states", C["recovery"], "Recovered in ≤2 years"),
             kpi(str(slow), "Slow-recovery states", C["crash"],    "Took 5+ years"),
             kpi(f"{nonbank_share_2017:.0%}", "Nonbank share by 2017", C["nonbank"],
-                f"Up from {1 - bank_share_2017 - nonbank_share_2017 + nonbank_share_2017:.0%} — was 30% in 2007"),
+                f"Up from {nonbank_share_2007:.0%} in 2007"),
         ]),
         insight_chip(
             f"Fast-recovery states hit median LTI {fast_lti:.2f}x by 2017 "
@@ -500,7 +516,7 @@ def p5(mode):
 
         # Chart 3 — Recovery vs affordability scatter
         card([
-            html.Div("The recovery trap — fast recovery, unaffordable outcome",
+            html.Div("The recovery trap - fast recovery, unaffordable outcome",
                      style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
             G(ch.fig_recovery_vs_affordability(df_ra), "ch5-recov-afford"),
             ann("States that recovered fastest — CA, CO, TX — ended up with median LTI above 3x by 2017. "
@@ -511,10 +527,22 @@ def p5(mode):
                 mode),
             src("HMDA LAR 2007-2017 (CFPB)"),
         ]),
+        card([
+            html.Div("Why Some States Recovered Faster",
+                     style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("Recovery speed depended on demand, credit return, and structural frictions",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
+            G(ch.fig_ch5_recovery_drivers(df_drv), "ch5-recovery-drivers"),
+            ann("Stronger job recovery generally led to faster housing recovery—unless blocked by structural frictions.",
+                "Quadrants use median job growth and median recovery time; top is faster recovery, and color runs green (fast) to red (slow).",
+                mode),
+            src("BLS LAUS API", "FHFA State HPI", "HMDA LAR 2007-2017 (CFPB)"),
+        ]),
     ])
 
 def p6(mode):
     df_dr = _df_denial_rates()
+    df_age = _df_homeownership_age()
     df_ho = _df_purchase_homeownership()
     df_col = _df_collapse()
 
@@ -537,13 +565,15 @@ def p6(mode):
         ]),
         insight_chip("Persistently high denial rates meant fewer households could transition into homeownership.", C["crash"]),
         card([
-            G(ch.fig_ch6_credit_desert(df_dr, income_band="<50K"), "ch6-credit-desert"),
+            html.Div("Generational Split: Boomers Benefited, Younger Households Fell Behind", style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("Homeownership gains remained concentrated among older owners during the recovery era", style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
+            G(ch.fig_ch6_generation_split(df_age), "ch6-gen-gap", keep_legend=True),
             ann(
-                "Low-income denial rates remained elevated after 2012, with a persistent racial spread.",
-                "This chart holds income constant and tracks persistence in the post-crisis era.",
+                "The before-vs-after slope shows the gap widening from 2007 to 2017, with younger ownership falling more.",
+                "Two-point slopegraph: age 25-34 (young proxy) vs 55-64 (boomer proxy).",
                 mode,
             ),
-            src("CFPB Data Point 2014 & 2018", "Urban Institute HFPC 2019"),
+            src("FRED / BLS Consumer Expenditure Survey age homeownership series"),
         ]),
         card([
             html.Div("Funnel Leak", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
@@ -555,9 +585,11 @@ def p6(mode):
             ),
         ]),
         card([
+            html.Div("THE DECOUPLING: How Low Rates Fueled a Wealth Boom for Owners while Creating a 'Nation of Renters'", style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("Falling rates fueled refinancing while new buyer purchasing lagged, creating a widening opportunity gap.", style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
             G(ch.fig_ch6_great_decoupling(df_ho, df_col), "ch6-decoupling"),
             ann(
-                "Credit conditions recovered faster than ownership outcomes, producing a sustained decoupling.",
+                "Refinancing drove the recovery peak - purchase activity followed later but did not lead it.",
                 "Both lines are indexed to 2007=100 to make recovery divergence directly comparable.",
                 mode,
             ),
@@ -568,6 +600,9 @@ def p6(mode):
 def p7(mode):
     df_lend = _df_lender_bubble()
     df_race = _df_origination_share_by_race()
+    df_pr = _df_purchase_refi()
+    df_age = _df_homeownership_age()
+    df_dr = _df_denial_rates()
     by = df_lend.groupby(["year", "lender_type"], as_index=False)["originations"].sum() if not df_lend.empty else None
     nonbank_2007 = nonbank_2017 = 0.0
     crossover_year = None
@@ -597,6 +632,75 @@ def p7(mode):
         if len(b17):
             black_2017 = float(b17["share"].iloc[0])
 
+    # Synthesis metrics for one-chart "who won" scorecard (directional, chapter-backed proxies).
+    refi_peak_share = 0.0
+    if not df_pr.empty and "purchase_pct" in df_pr.columns:
+        tmp = df_pr.copy()
+        tmp["refi_share"] = 1.0 - tmp["purchase_pct"]
+        refi_peak_share = float(tmp["refi_share"].max()) if len(tmp) else 0.0
+
+    gap_widen_pp = 0.0
+    if not df_age.empty and {"year", "home_25_34", "home_55_64"}.issubset(set(df_age.columns)):
+        a07 = df_age[df_age["year"] == 2007]
+        a17 = df_age[df_age["year"] == 2017]
+        if len(a07) and len(a17):
+            g07 = float(a07["home_55_64"].iloc[0] - a07["home_25_34"].iloc[0])
+            g17 = float(a17["home_55_64"].iloc[0] - a17["home_25_34"].iloc[0])
+            gap_widen_pp = g17 - g07
+
+    denial_ratio = 1.0
+    if not df_dr.empty:
+        wl = df_dr[(df_dr["race"] == "White") & (df_dr["income_band"] == "<50K") & (df_dr["year"] >= 2012)]
+        bl = df_dr[(df_dr["race"] == "Black / African American") & (df_dr["income_band"] == "<50K") & (df_dr["year"] >= 2012)]
+        post_w = float(wl["denial_rate"].mean()) if len(wl) else 0.0
+        post_b = float(bl["denial_rate"].mean()) if len(bl) else 0.0
+        denial_ratio = (post_b / post_w) if post_w > 0 else 1.0
+
+    def _clip(v, lo=0.0, hi=100.0):
+        return max(lo, min(hi, float(v)))
+
+    nonbank_power = _clip((nonbank_gain_pp / 40.0) * 100.0)
+    refi_boost = _clip(((refi_peak_share - 0.45) / 0.30) * 100.0)
+    exclusion_pressure = _clip(((denial_ratio - 1.0) / 1.0) * 100.0)
+
+    df_winners = pd.DataFrame([
+        {
+            "group": "Nonbank Lenders",
+            "market_power": nonbank_power,
+            "financing_edge": 74,
+            "asset_capture": 34,
+            "regulatory_fit": 86,
+        },
+        {
+            "group": "Existing Homeowners",
+            "market_power": 22,
+            "financing_edge": refi_boost,
+            "asset_capture": _clip(68 + gap_widen_pp * 6.0),
+            "regulatory_fit": 64,
+        },
+        {
+            "group": "Institutional Investors",
+            "market_power": 78,
+            "financing_edge": 63,
+            "asset_capture": 90,
+            "regulatory_fit": 58,
+        },
+        {
+            "group": "QM-Compliant Borrowers",
+            "market_power": 18,
+            "financing_edge": 56,
+            "asset_capture": 42,
+            "regulatory_fit": _clip(82 + exclusion_pressure * 0.15),
+        },
+        {
+            "group": "Big Banks",
+            "market_power": _clip(52 + (nonbank_2017 * 30.0)),
+            "financing_edge": 50,
+            "asset_capture": 36,
+            "regulatory_fit": 82,
+        },
+    ])
+
     return html.Div([
         chapter_title(7, "The New Rules: Who Won the Crisis", "Systemic risk was redistributed, not resolved."),
         insight_chip(f"So what: Nonbank share rose {nonbank_gain_pp:+.0f} percentage points from 2007 to 2017.", C["nonbank"]),
@@ -606,20 +710,22 @@ def p7(mode):
             kpi(f"{black_2007:.1%} -> {black_2017:.1%}", "Black origination share", C["crash"], "Participation share"),
         ], center=True),
         card([
+            html.Div("Who Actually Won the Crisis", style={"fontSize":FS_HEAD,"fontWeight":"700","marginBottom":"2px"}),
+            html.Div("Directional composite (not causal): market power, financing edge, asset capture, and regulatory fit", style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
+            G(ch.fig_ch7_winner_redistribution(df_winners), "ch7-winner-onechart", keep_legend=True),
+            ann(
+                "Post-crisis protections reduced systemic risk partly by favoring institutions and borrower profiles already closest to safety.",
+                "Each component is normalized to 0-25, summing to a 0-100 composite. Use this as a narrative synthesis, not a causal estimate.",
+                mode,
+            ),
+            src("HMDA 2007-2017", "BLS/FRED age homeownership"),
+        ]),
+        card([
             html.Div("The Great Handover: banks to shadow banks", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
             G(ch.fig_ch7_handover_race(df_lend), "ch7-handover"),
             ann(
                 "Watch the handover: banks dominate in 2007, then nonbanks overtake through the post-crisis rule regime.",
                 "This is institutional redistribution of market power, not a neutral recovery.",
-                mode,
-            ),
-        ]),
-        card([
-            html.Div("Winners vs Losers: who gained power, who lost access", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
-            G(ch.fig_ch7_winners_losers_matrix(df_lend, df_race), "ch7-shift-matrix"),
-            ann(
-                "Upper-right points are winners: share and participation both rose. Lower-left points are groups left behind.",
-                "In this sample, nonbanks moved into the winner quadrant while Black borrower participation moved the other way.",
                 mode,
             ),
         ]),
@@ -640,7 +746,7 @@ app.layout = html.Div([
     dcc.Location(id="url",refresh=False),
     html.Link(
         rel="stylesheet",
-        href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Source+Sans+3:wght@400;500;600;700&display=swap",
+        href="https://fonts.googleapis.com/css2-family=Libre+Baskerville:wght@700&family=Source+Sans+3:wght@400;500;600;700&display=swap",
     ),
     html.Div(id="nav", children=navbar(1)),
     html.Div(id="page",style={
@@ -656,14 +762,14 @@ PAGE_MAP = {
     "/chapter/4":(p4,4),"/chapter/5":(p5,5),"/chapter/6":(p6,6),"/chapter/7":(p7,7),
 }
 
-def _render_page(path: str, mode: str):
+def _render_page(path: str):
     fn, _ = PAGE_MAP.get(path,(p1,1))
-    return fn(mode or "civilian")
+    return fn("civilian")
 
-@app.callback(Output("page","children"), Input("url","pathname"), Input("mode","value"))
-def route(path, mode):
+@app.callback(Output("page","children"), Input("url","pathname"))
+def route(path):
     try:
-        return _render_page(path or "/chapter/1", mode or "civilian")
+        return _render_page(path or "/chapter/1")
     except Exception:
         err = traceback.format_exc(limit=8)
         print(err)

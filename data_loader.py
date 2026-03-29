@@ -195,6 +195,32 @@ def recovery_vs_affordability():
     })
 
 
+def recovery_drivers_state():
+    """
+    Ch 5: state-level recovery drivers panel for bubble chart.
+
+    Expected columns:
+      - state
+      - recovery_years
+      - employment_recovery_pct
+      - nonbank_accel_pp
+      - price_recovery_lag_years
+    """
+    path = f"{DATA_DIR}/recovery_drivers_state.parquet"
+    if USE_REAL_DATA and os.path.exists(path):
+        df = _load("recovery_drivers_state.parquet")
+        if df is not None:
+            return _rename_if_present(df, {"rvs_years": "recovery_years"})
+    return pl.DataFrame(schema={
+        "state": pl.Utf8,
+        "first_recovery_year": pl.Int32,
+        "recovery_years": pl.Int32,
+        "employment_recovery_pct": pl.Float64,
+        "nonbank_accel_pp": pl.Float64,
+        "price_recovery_lag_years": pl.Float64,
+    })
+
+
 def rvs_scores():
     """Ch 5: Recovery Velocity Score per state"""
     if USE_REAL_DATA and _real_available():
@@ -430,6 +456,69 @@ def purchase_homeownership():
         "purchase_originations": pl.Int64,
         "homeownership_rate": pl.Float64,
     })
+
+
+def mortgage_rate_series():
+    """
+    Ch 6 cost panel: annual 30-year mortgage rate.
+    Uses local FRED-derived cache when available.
+    """
+    path = f"{DATA_DIR}/fred_mortgage_annual.csv"
+    if os.path.exists(path):
+        try:
+            df = pl.read_csv(path)
+            if "year" in df.columns and "mortgage_rate_30y" in df.columns:
+                return (
+                    df.select([
+                        pl.col("year").cast(pl.Int32),
+                        pl.col("mortgage_rate_30y").cast(pl.Float64),
+                    ])
+                    .sort("year")
+                )
+        except Exception:
+            pass
+
+    return pl.DataFrame({
+        "year": list(range(2007, 2018)),
+        "mortgage_rate_30y": [6.34, 6.03, 5.04, 4.69, 4.45, 3.66, 3.98, 4.17, 3.85, 3.65, 3.99],
+    }).with_columns([
+        pl.col("year").cast(pl.Int32),
+        pl.col("mortgage_rate_30y").cast(pl.Float64),
+    ])
+
+
+def homeownership_by_age():
+    """
+    Ch 6: generational homeownership split.
+    Uses local FRED cache for age 25-34 (young proxy) and 55-64 (boomer proxy).
+    """
+    path = f"{DATA_DIR}/fred_homeownership_age_annual.csv"
+    if os.path.exists(path):
+        try:
+            df = pl.read_csv(path)
+            needed = {"year", "home_25_34", "home_55_64"}
+            if needed.issubset(set(df.columns)):
+                return (
+                    df.select([
+                        pl.col("year").cast(pl.Int32),
+                        pl.col("home_25_34").cast(pl.Float64),
+                        pl.col("home_55_64").cast(pl.Float64),
+                    ])
+                    .sort("year")
+                )
+        except Exception:
+            pass
+
+    # Fallback keeps chart functional if local cache is unavailable.
+    return pl.DataFrame({
+        "year": list(range(2007, 2018)),
+        "home_25_34": [47, 46, 46, 45, 43, 40, 40, 39, 39, 37, 41],
+        "home_55_64": [81, 81, 81, 80, 79, 79, 79, 77, 75, 76, 78],
+    }).with_columns([
+        pl.col("year").cast(pl.Int32),
+        pl.col("home_25_34").cast(pl.Float64),
+        pl.col("home_55_64").cast(pl.Float64),
+    ])
 
 
 def lender_bubble():

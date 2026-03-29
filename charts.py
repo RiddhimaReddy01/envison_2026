@@ -29,18 +29,18 @@ C = {
     "grid":        "rgba(26,26,26,0.10)",
     "border":      "rgba(26,26,26,0.20)",
     "text":        "#1A1A1A",
-    "muted":       "#5A5A5A",
+    "muted":       "#3F3F3F",
     "surface":     "#EFEDE7",
 
     # Semantic
     "crash":       "#E3120B",
     "recovery":    "#2C7A5A",
     "govt":        "#006BA2",
-    "conventional":"#767676",
+    "conventional":"#23364D",
     "warning":     "#A6761D",
     "purchase":    "#006BA2",
     "refi":        "#3D8B6D",
-    "bank":        "#767676",
+    "bank":        "#23364D",
     "nonbank":     "#A84A34",
     "veteran":     "#4F4B7A",
     "fha":         "#006BA2",
@@ -48,7 +48,7 @@ C = {
     "fsa":         "#84BDAA",
 
     # Race palette
-    "white":       "#767676",
+    "white":       "#23364D",
     "black":       "#D7261E",
     "hispanic":    "#A6761D",
     "asian":       "#006BA2",
@@ -85,7 +85,11 @@ def _base_layout(height=H, margin=None, **kwargs):
         transition=dict(duration=90, easing="linear"),
         font=dict(family=FONT, size=12, color=C["text"]),
         title=dict(font=dict(family=FONT_SERIF, size=14, color=C["text"]), x=0, xanchor="left"),
-        hoverlabel=dict(font=dict(family=FONT, size=11), bgcolor="rgba(255,255,255,0.97)", bordercolor=C["border"]),
+        hoverlabel=dict(
+            font=dict(family=FONT, size=12, color=C["text"]),
+            bgcolor="rgba(255,255,255,0.98)",
+            bordercolor=C["border"],
+        ),
         colorway=["#006BA2", "#E3120B", "#379A8B", "#A6761D", "#7A7A7A", "#3EBCD2"],
         legend=dict(
             orientation="h",
@@ -294,7 +298,7 @@ def fig_lti_violin(df: pd.DataFrame) -> go.Figure:
         height=H_SM + 60,
         margin=dict(l=48, r=120, t=36, b=44),
         title=dict(
-            text="Loan-to-income ratio — how much were borrowers stretching?",
+            text="Loan-to-income ratio — how much were borrowers stretching-",
             font=dict(size=13, weight=500), x=0, xanchor="left",
         ),
         xaxis=dict(showgrid=False, zeroline=False,
@@ -366,7 +370,7 @@ def fig_lti_by_income_band(df: pd.DataFrame) -> go.Figure:
         height=H_SM + 40,
         margin=dict(l=48, r=130, t=36, b=44),
         title=dict(
-            text="Median loan/income ratio by income band — who was really over-leveraged?",
+            text="Median loan/income ratio by income band — who was really over-leveraged-",
             font=dict(size=13, weight=500), x=0, xanchor="left",
         ),
         xaxis=dict(showgrid=False, zeroline=False,
@@ -1660,58 +1664,6 @@ def fig_ch6_credit_desert(df: pd.DataFrame, income_band: str = "<50K") -> go.Fig
             hovertemplate=f"{race}<br>%{{x}}: %{{y:.1%}}<extra></extra>",
         ))
 
-    b = d[d["race"] == "Black / African American"]
-    if not b.empty and (b["year"] == 2010).any():
-        p = b[b["year"] == 2010].iloc[0]
-        fig.add_annotation(
-            x=2010, y=float(p["denial_rate"]),
-            text="2010: Peak of No",
-            showarrow=True, arrowhead=2, ax=30, ay=-35,
-            font=dict(size=10, color=C["crash"]),
-            bgcolor="rgba(255,255,255,0.95)", bordercolor=C["crash"], borderwidth=0.6, borderpad=3,
-        )
-
-    fig.add_vrect(
-        x0=2012, x1=float(d["year"].max()) + 0.2,
-        fillcolor="rgba(215,38,30,0.07)",
-        line_width=0,
-    )
-    fig.add_annotation(
-        x=2012.1, y=0.95, xref="x", yref="paper",
-        text="Post-2012: denial gap persists",
-        showarrow=False, xanchor="left",
-        font=dict(size=10, color=C["crash"]),
-        bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
-    )
-
-    w = d[d["race"] == "White"]
-    if not b.empty and not w.empty:
-        pre_b = float(b[b["year"] <= 2011]["denial_rate"].mean()) if len(b[b["year"] <= 2011]) else np.nan
-        pre_w = float(w[w["year"] <= 2011]["denial_rate"].mean()) if len(w[w["year"] <= 2011]) else np.nan
-        post_b = float(b[b["year"] >= 2012]["denial_rate"].mean()) if len(b[b["year"] >= 2012]) else np.nan
-        post_w = float(w[w["year"] >= 2012]["denial_rate"].mean()) if len(w[w["year"] >= 2012]) else np.nan
-        if pre_w and post_w and pre_w > 0 and post_w > 0:
-            rel_pre = (pre_b - pre_w) / pre_w
-            rel_post = (post_b - post_w) / post_w
-            trend = "widened" if rel_post > rel_pre else "narrowed"
-            fig.add_annotation(
-                x=0.98, y=0.06, xref="paper", yref="paper",
-                text=f"Double delta: rates fell for both groups, but relative gap {trend} after 2012.",
-                showarrow=False, xanchor="right",
-                font=dict(size=9, color=C["muted"]),
-                bgcolor="rgba(255,255,255,0.92)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
-            )
-        post_b_lvl = float(b[b["year"] >= 2012]["denial_rate"].mean()) if len(b[b["year"] >= 2012]) else np.nan
-        pre_w_lvl = float(w[w["year"] <= 2008]["denial_rate"].mean()) if len(w[w["year"] <= 2008]) else np.nan
-        if post_b_lvl == post_b_lvl and pre_w_lvl == pre_w_lvl:
-            fig.add_annotation(
-                x=0.02, y=0.88, xref="paper", yref="paper",
-                text=f"Persistence: post-2012 Black denial {post_b_lvl:.0%} > pre-crisis White ~{pre_w_lvl:.0%}.",
-                showarrow=False, xanchor="left",
-                font=dict(size=9, color=C["crash"]),
-                bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.5, borderpad=3,
-            )
-
     fig.update_layout(**_base_layout(
         height=H_SM + 80,
         margin=dict(l=52, r=24, t=38, b=50),
@@ -2034,7 +1986,7 @@ def fig_ch7_winners_losers_matrix(df_lender: pd.DataFrame, df_race_share: pd.Dat
             bordercolor=lc, borderwidth=0.8, borderpad=3,
         )
 
-    # "So What?" corner note
+    # "So What-" corner note
     fig.add_annotation(
         x=0.01, y=0.03, xref="paper", yref="paper",
         text="The recovery was an institutional success — but a demographic tragedy",
@@ -2705,7 +2657,7 @@ def fig_ch4_above_3x(df: pd.DataFrame) -> go.Figure:
 
     fig.update_layout(**_base_layout(
         height=H_SM + 80,
-        title=dict(text="How widespread was high leverage? Loan mix by leverage threshold", font=dict(size=13), x=0, xanchor="left"),
+        title=dict(text="How widespread was high leverage- Loan mix by leverage threshold", font=dict(size=13), x=0, xanchor="left"),
         xaxis=dict(showgrid=False, tickcolor=C["border"], automargin=True, dtick=1),
         yaxis=dict(gridcolor=C["grid"], tickformat=".0%", title="Share of all loans", automargin=True, range=[0, 1]),
         legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
@@ -3197,7 +3149,7 @@ def fig_ch4_refi_mirage(df_pr: pd.DataFrame, df_ho: pd.DataFrame) -> go.Figure:
         row = c2012.iloc[0]
         total = float(row["purchase"] + row["refinance"])
         refi_share = (float(row["refinance"]) / total) if total else 0.0
-        txt = f"2012 Peak: 72% Refinance Share<br>Volume hit 8.1M — but zero new owners created"
+        txt = f"2012 Peak: 72% Refinance Share<br>Volume hit 8.1M - but new purchase entry stayed limited"
         fig.add_annotation(
             x=2012, y=float(row["refinance"] + row["purchase"]) * 0.88,
             text=txt,
@@ -3214,7 +3166,7 @@ def fig_ch4_refi_mirage(df_pr: pd.DataFrame, df_ho: pd.DataFrame) -> go.Figure:
             fig.add_annotation(
                 x=2014.5, y=float(ho_2017.iloc[0]),
                 xref="x", yref="y2",
-                text="Homeownership fell 4.2pp<br>as volume recovered — decoupling",
+                text="Homeownership fell 4.2pp<br>as volume recovered - decoupling",
                 showarrow=True, arrowhead=2, arrowwidth=1.2, ax=0, ay=-50,
                 font=dict(size=10, color="#111111"),
                 bgcolor="rgba(255,255,255,0.95)", bordercolor="#111111", borderwidth=0.8, borderpad=5,
@@ -3224,7 +3176,7 @@ def fig_ch4_refi_mirage(df_pr: pd.DataFrame, df_ho: pd.DataFrame) -> go.Figure:
         height=H,
         margin=dict(l=54, r=64, t=52, b=48),
         title=dict(text="The Refi Mirage: Volume Recovered, Homeownership Stalled", font=dict(size=13), x=0, xanchor="left"),
-        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007–2017)"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007-2017)"),
         yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, tickformat=".2s", title="Loan Volume (Millions)"),
         yaxis2=dict(
             overlaying="y", side="right", showgrid=False, zeroline=False,
@@ -3409,7 +3361,7 @@ def fig_ch4_lti_income_groups(df: pd.DataFrame) -> go.Figure:
         height=H_SM + 100,
         margin=dict(l=54, r=24, t=52, b=48),
         title=dict(text="The Squeezed Middle: Leverage Accelerating Toward the Ceiling", font=dict(size=13), x=0, xanchor="left"),
-        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007–2017)"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007-2017)"),
         yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, title="Median Loan-to-Income Ratio (×)", range=[1.5, 3.5]),
         legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
     ))
@@ -3607,7 +3559,7 @@ def fig_bank_nonbank_slope(df: pd.DataFrame) -> go.Figure:
         height=H + 30,
         margin=dict(l=54, r=48, t=52, b=64),
         title=dict(text="The Great Handover: Banks Exit, Nonbanks Enter", font=dict(size=13), x=0, xanchor="left"),
-        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007–2017)"),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], title="Year (2007-2017)"),
         yaxis=dict(gridcolor=C["grid"], zeroline=False, tickformat=".0%", title="Share of Originations (%)", range=[0.15, 0.90]),
         legend=dict(orientation="h", x=0, y=1.02, xanchor="left", yanchor="bottom"),
     ))
@@ -3701,6 +3653,459 @@ def fig_recovery_vs_affordability(df: pd.DataFrame) -> go.Figure:
         ),
         showlegend=False,
     ))
+    return fig
+
+
+def fig_ch5_recovery_drivers(df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if df is None or df.empty:
+        return fig
+    need = {"state", "recovery_years", "employment_recovery_pct", "nonbank_accel_pp", "price_recovery_lag_years"}
+    if not need.issubset(set(df.columns)):
+        return fig
+    d = df.dropna(subset=["recovery_years", "employment_recovery_pct"]).copy()
+    if d.empty:
+        return fig
+    d["state"] = d["state"].astype(str).str.upper().replace({"MCO": "MO"})
+    x_min = float(d["employment_recovery_pct"].min())
+    x_max = float(d["employment_recovery_pct"].max())
+    y_min = float(d["recovery_years"].min())
+    y_max = float(d["recovery_years"].max())
+    x_pad = max(0.25, (x_max - x_min) * 0.08)
+    y_pad = max(0.25, (y_max - y_min) * 0.08)
+    x_lo, x_hi = x_min - x_pad, x_max + x_pad
+    y_lo, y_hi = y_min - y_pad, y_max + y_pad
+    # Use midpoints so the four quadrants occupy equal chart area.
+    x_med = (x_lo + x_hi) / 2.0
+    y_med = (y_lo + y_hi) / 2.0
+    c = d["recovery_years"].astype(float)
+    cmin = float(c.min())
+    cmax = float(c.max())
+    cspan = cmax - cmin if cmax > cmin else 1.0
+    c_norm = (c - cmin) / cspan
+    custom = (
+        d[["nonbank_accel_pp", "price_recovery_lag_years"]]
+        .fillna(0.0)
+        .astype(float)
+        .to_numpy()
+    )
+    fig.add_trace(go.Scatter(
+        x=d["employment_recovery_pct"],
+        y=d["recovery_years"],
+        mode="markers",
+        text=d["state"],
+        marker=dict(
+            size=14,
+            color=c_norm,
+            colorscale=[[0.0, "#2C7A5A"], [0.5, "#F59E0B"], [1.0, "#D7261E"]],
+            line=dict(color="rgba(17,17,17,0.45)", width=0.8),
+            opacity=0.88,
+            showscale=False,
+        ),
+        customdata=custom,
+        hovertemplate="<b>%{text}</b><br>Employment recovery: %{x:.1f}%<br>Recovery years: %{y:.0f}<br>Nonbank acceleration: %{customdata[0]:+.1f} pp<br>Price recovery lag: %{customdata[1]:.1f} years<extra></extra>",
+    ))
+    fig.add_vline(x=x_med, line=dict(color="rgba(26,26,26,0.40)", width=1.2, dash="dash"))
+    fig.add_hline(y=y_med, line=dict(color="rgba(26,26,26,0.40)", width=1.2, dash="dash"))
+    # Label states with small vertical offsets where points overlap.
+    d_plot = d.assign(
+        x_round=d["employment_recovery_pct"].round(1),
+        y_round=d["recovery_years"].round(1),
+    )
+    for (_, _), g in d_plot.groupby(["x_round", "y_round"], sort=False):
+        shifts = [14, -14, 24, -24, 32, -32]
+        for i, row in enumerate(g.itertuples(index=False)):
+            base_shift = -14 if float(row.recovery_years) <= y_med else 12
+            yshift = base_shift + shifts[i % len(shifts)]
+            fig.add_annotation(
+                x=row.employment_recovery_pct,
+                y=row.recovery_years,
+                text=str(row.state),
+                showarrow=False,
+                yshift=yshift,
+                font=dict(size=12, color=C["text"]),
+            )
+    fig.add_annotation(
+        x=0.78, y=0.88, xref="paper", yref="paper",
+        text="Demand-led recovery",
+        showarrow=False, font=dict(size=12, color=C["recovery"]),
+    )
+    fig.add_annotation(
+        x=0.80, y=0.12, xref="paper", yref="paper",
+        text="Friction-dominated (backlogs)",
+        showarrow=False, font=dict(size=12, color=C["crash"]),
+    )
+    fig.add_annotation(
+        x=0.12, y=0.86, xref="paper", yref="paper",
+        text="Credit-driven recovery",
+        showarrow=False, font=dict(size=12, color="#B54708"),
+    )
+    fig.add_annotation(
+        x=0.01, y=1.04, xref="paper", yref="paper",
+        text="Top = faster recovery",
+        showarrow=False, xanchor="left", yanchor="top",
+        font=dict(size=11, color=C["muted"]),
+    )
+    for st, label, ax, ay in [("FL", "High friction despite demand", 24, -26)]:
+        s = d[d["state"] == st]
+        if s.empty:
+            continue
+        r = s.iloc[0]
+        fig.add_annotation(
+            x=float(r["employment_recovery_pct"]),
+            y=float(r["recovery_years"]),
+            text=label,
+            showarrow=True,
+            arrowhead=2,
+            arrowwidth=1.0,
+            ax=ax,
+            ay=ay,
+            font=dict(size=10, color=C["text"]),
+            bgcolor="rgba(255,255,255,0.92)",
+            bordercolor=C["border"],
+            borderwidth=0.6,
+            borderpad=3,
+        )
+    fig.update_layout(**_base_layout(
+        height=H,
+        margin=dict(l=58, r=36, t=40, b=50),
+        xaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, range=[x_lo, x_hi], title=dict(text="Employment recovery (% 2009-2013)", font=dict(size=16, color=C["text"])), tickfont=dict(size=16)),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, range=[y_hi, y_lo], title=dict(text="Time to Recover (Years)", font=dict(size=16, color=C["text"])), tickfont=dict(size=16)),
+        font=dict(size=16, color=C["text"]),
+    ))
+    return fig
+
+
+def fig_ch6_generation_split(df_age: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if df_age is None or df_age.empty:
+        return fig
+    need = {"year", "home_25_34", "home_55_64"}
+    if not need.issubset(set(df_age.columns)):
+        return fig
+    d = df_age.dropna(subset=["year", "home_25_34", "home_55_64"]).copy().sort_values("year")
+    if d.empty:
+        return fig
+
+    start_year, end_year = 2007, 2017
+    s = d[d["year"] == start_year]
+    e = d[d["year"] == end_year]
+    if s.empty:
+        s = d.head(1)
+        start_year = int(s["year"].iloc[0])
+    if e.empty:
+        e = d.tail(1)
+        end_year = int(e["year"].iloc[0])
+    p0 = s.iloc[0]
+    p1 = e.iloc[0]
+
+    young_start = float(p0["home_25_34"])
+    young_end = float(p1["home_25_34"])
+    older_start = float(p0["home_55_64"])
+    older_end = float(p1["home_55_64"])
+    g0 = older_start - young_start
+    g1 = older_end - young_end
+
+    x0, x1 = 0, 1
+
+    fig.add_trace(go.Scatter(
+        x=[x0, x1], y=[older_start, older_end],
+        mode="lines+markers",
+        name="Age 55-64 (boomer proxy)",
+        line=dict(color=C["recovery"], width=3.0),
+        marker=dict(size=9, color=C["recovery"]),
+        hovertemplate="55-64<br>%{x}: %{y:.1f}%<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=[x0, x1], y=[young_start, young_end],
+        mode="lines+markers",
+        name="Age 25-34 (young proxy)",
+        line=dict(color=C["crash"], width=3.0),
+        marker=dict(size=9, color=C["crash"]),
+        hovertemplate="25-34<br>%{x}: %{y:.1f}%<extra></extra>",
+    ))
+
+    # Gap markers at start/end years.
+    fig.add_shape(type="line", x0=x0, x1=x0, y0=young_start, y1=older_start,
+                  line=dict(color="rgba(26,26,26,0.45)", width=1.5, dash="dot"))
+    fig.add_shape(type="line", x0=x1, x1=x1, y0=young_end, y1=older_end,
+                  line=dict(color="rgba(26,26,26,0.45)", width=1.5, dash="dot"))
+
+    # Endpoint labels
+    fig.add_annotation(x=x0, y=older_start, text=f"Older: {older_start:.0f}%",
+                       showarrow=False, xshift=38, yshift=10, font=dict(size=11, color=C["recovery"]))
+    fig.add_annotation(x=x0, y=young_start, text=f"Young: {young_start:.0f}%",
+                       showarrow=False, xshift=38, yshift=-10, font=dict(size=11, color=C["crash"]))
+    fig.add_annotation(x=x1, y=older_end, text=f"Older: {older_end:.0f}%",
+                       showarrow=False, xshift=-42, yshift=10, font=dict(size=11, color=C["recovery"]))
+    fig.add_annotation(x=x1, y=young_end, text=f"Young: {young_end:.0f}%",
+                       showarrow=False, xshift=-42, yshift=-10, font=dict(size=11, color=C["crash"]))
+
+    # Gap labels
+    fig.add_annotation(x=x0, y=(older_start + young_start) / 2.0, text=f"Gap: {g0:.1f}pp",
+                       showarrow=False, xshift=52, font=dict(size=11, color=C["text"]),
+                       bgcolor="rgba(255,255,255,0.94)", bordercolor=C["border"], borderwidth=0.6, borderpad=3)
+    fig.add_annotation(x=x1, y=(older_end + young_end) / 2.0, text=f"Gap: {g1:.1f}pp",
+                       showarrow=False, xshift=-56, font=dict(size=11, color=C["text"]),
+                       bgcolor="rgba(255,255,255,0.94)", bordercolor=C["border"], borderwidth=0.6, borderpad=3)
+
+    fig.update_layout(**_base_layout(
+        height=H_SM + 80,
+        margin=dict(l=54, r=24, t=36, b=46),
+        xaxis=dict(type="linear", range=[-0.15, 1.15], tickmode="array", tickvals=[0, 1], ticktext=[str(start_year), str(end_year)], showgrid=False, zeroline=False, tickcolor=C["border"], tickfont=dict(size=16), title=dict(text="Before vs After", font=dict(size=16, color=C["text"]))),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, range=[34, 86], title=dict(text="Homeownership rate (%)", font=dict(size=16, color=C["text"])), tickfont=dict(size=16)),
+        showlegend=False,
+        font=dict(size=16, color=C["text"]),
+    ))
+    return fig
+
+
+def fig_ch6_cost_access(df_pr: pd.DataFrame, df_mr: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if df_pr is None or df_pr.empty:
+        return fig
+    need = {"year", "purchase", "refinance"}
+    if not need.issubset(set(df_pr.columns)):
+        return fig
+    d = df_pr.copy().sort_values("year")
+    mr = df_mr.copy().sort_values("year") if df_mr is not None and not df_mr.empty else pd.DataFrame(columns=["year", "mortgage_rate_30y"])
+    m = d.merge(mr[["year", "mortgage_rate_30y"]] if "mortgage_rate_30y" in mr.columns else mr, on="year", how="left")
+    if m.empty or "year" not in m.columns:
+        return fig
+
+    m = m.dropna(subset=["year"]).copy()
+    m["year"] = m["year"].astype(int)
+    base_row = m[m["year"] == 2007]
+    if base_row.empty:
+        base_row = m.head(1)
+    base_rate = float(base_row["mortgage_rate_30y"].iloc[0]) if "mortgage_rate_30y" in base_row.columns else np.nan
+    base_refi = float(base_row["refinance"].iloc[0])
+    base_purch = float(base_row["purchase"].iloc[0])
+    base_rate = base_rate if pd.notna(base_rate) and base_rate > 0 else float(m["mortgage_rate_30y"].dropna().iloc[0]) if "mortgage_rate_30y" in m.columns and len(m["mortgage_rate_30y"].dropna()) else 1.0
+    base_refi = base_refi if base_refi > 0 else 1e-6
+    base_purch = base_purch if base_purch > 0 else 1e-6
+
+    m["cost_idx"] = (m["mortgage_rate_30y"] / base_rate) * 100.0
+    m["refi_idx"] = (m["refinance"] / base_refi) * 100.0
+    m["purchase_idx"] = (m["purchase"] / base_purch) * 100.0
+
+    # Fill only positive refi-over-purchase spread to visualize the opportunity gap.
+    m["gap_idx"] = m["refi_idx"] - m["purchase_idx"]
+    m["opportunity_top"] = m["purchase_idx"] + m["gap_idx"].clip(lower=0.0)
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["purchase_idx"],
+        mode="lines",
+        line=dict(width=0),
+        hoverinfo="skip",
+        showlegend=False,
+    ))
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["opportunity_top"],
+        mode="lines",
+        line=dict(width=0),
+        fill="tonexty",
+        fillcolor="rgba(230, 90, 50, 0.16)",
+        hoverinfo="skip",
+        showlegend=False,
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["cost_idx"],
+        mode="lines+markers", name="Cost of borrowing",
+        line=dict(color="#B54708", width=2.8, shape="spline", smoothing=0.65),
+        marker=dict(size=5, color="#B54708"),
+        hovertemplate="Cost of borrowing (index)<br>%{x}: %{y:.0f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["refi_idx"],
+        mode="lines+markers", name="Existing owners (refi volume)",
+        line=dict(color=C["crash"], width=2.6, shape="spline", smoothing=0.65),
+        marker=dict(size=5, color=C["crash"]),
+        hovertemplate="Existing owners (refi volume index)<br>%{x}: %{y:.0f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["purchase_idx"],
+        mode="lines+markers", name="New buyers (purchase volume)",
+        line=dict(color=C["govt"], width=2.6, shape="spline", smoothing=0.65),
+        marker=dict(size=5, color=C["govt"]),
+        hovertemplate="New buyers (purchase volume index)<br>%{x}: %{y:.0f}<extra></extra>",
+    ))
+
+    # Decoupling point = max refi-over-purchase spread.
+    dec_row = m.loc[m["gap_idx"].idxmax()]
+    dec_year = float(dec_row["year"])
+    dec_refi = float(dec_row["refi_idx"])
+    dec_purchase = float(dec_row["purchase_idx"])
+    dec_gap = float(dec_row["gap_idx"])
+    dec_mid = (dec_refi + dec_purchase) / 2.0
+
+    fig.add_trace(go.Scatter(
+        x=[dec_year], y=[dec_refi],
+        mode="markers",
+        marker=dict(size=9, color="#111111"),
+        showlegend=False,
+        hovertemplate="Decoupling point<br>%{x}: %{y:.0f}<extra></extra>",
+    ))
+    fig.add_shape(
+        type="line",
+        x0=dec_year, x1=dec_year,
+        y0=dec_purchase, y1=dec_refi,
+        line=dict(color="#111111", width=1.6, dash="dot"),
+    )
+    fig.add_annotation(
+        x=dec_year, y=dec_mid,
+        text=f"Decoupling point: {int(dec_year)}<br>Refi-Purchase gap = +{dec_gap:.1f}",
+        showarrow=True, arrowhead=2, arrowwidth=1.0, ax=30, ay=-28,
+        font=dict(size=10, color="#111111"),
+    )
+    fig.add_annotation(
+        x=dec_year + 0.2, y=dec_mid + 10.0,
+        text="Opportunity Gap",
+        showarrow=False,
+        font=dict(size=11, color="#B54708"),
+    )
+    fig.add_annotation(
+        x=dec_year, y=dec_refi,
+        text=f"Refinancing spike ({dec_refi:.0f})",
+        showarrow=True, arrowhead=2, arrowwidth=1.0, ax=36, ay=-48,
+        font=dict(size=10, color=C["crash"]),
+    )
+
+    if not m.empty:
+        e = m.iloc[-1]
+        fig.add_annotation(x=float(e["year"]), y=float(e["cost_idx"]), text=f"Cost of borrowing ({e['cost_idx']:.0f})", showarrow=False, xanchor="left", yshift=10, font=dict(size=11, color="#B54708"))
+        fig.add_annotation(x=float(e["year"]), y=float(e["refi_idx"]), text=f"Refi volume ({e['refi_idx']:.0f})", showarrow=False, xanchor="left", yshift=-2, font=dict(size=11, color=C["crash"]))
+        fig.add_annotation(x=float(e["year"]), y=float(e["purchase_idx"]), text=f"Purchase volume ({e['purchase_idx']:.0f})", showarrow=False, xanchor="left", yshift=-12, font=dict(size=11, color=C["govt"]))
+
+    fig.add_hline(
+        y=100, line=dict(color="#111111", width=2.2, dash="solid"),
+        annotation_text="2007 baseline = 100", annotation_position="top left",
+        annotation_font=dict(size=10, color="#111111"),
+    )
+    fig.update_layout(**_base_layout(
+        height=H,
+        margin=dict(l=54, r=150, t=34, b=46),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], tickfont=dict(size=16)),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, title=dict(text="Index (2007=100)", font=dict(size=16, color=C["text"])), tickfont=dict(size=16)),
+        legend=dict(x=0.01, y=0.99, xanchor="left", yanchor="top", orientation="h"),
+        font=dict(size=16, color=C["text"]),
+    ))
+    return fig
+
+
+def fig_ch6_entry_gap(df_pr: pd.DataFrame, df_col: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    if df_pr is None or df_pr.empty or df_col is None or df_col.empty or "purchase_pct" not in df_pr.columns:
+        return fig
+    pr = df_pr.copy().sort_values("year")
+    col = df_col.copy().sort_values("year")
+    m = pr[["year", "purchase_pct"]].merge(col[["year", "applications"]], on="year", how="inner").sort_values("year")
+    if m.empty:
+        return fig
+    base = float(m.loc[m["year"] == 2007, "applications"].iloc[0]) if len(m[m["year"] == 2007]) else float(m["applications"].iloc[0])
+    m["applications_idx"] = (m["applications"] / base) * 100.0 if base else 100.0
+    fig.add_trace(go.Bar(
+        x=m["year"], y=m["applications_idx"],
+        name="Applications index",
+        marker_color="rgba(40,92,154,0.28)",
+        marker_line=dict(color=C["govt"], width=0.8),
+        hovertemplate="Applications index<br>%{x}: %{y:.1f}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=m["year"], y=m["purchase_pct"] * 100.0,
+        mode="lines+markers", name="Purchase share",
+        line=dict(color=C["recovery"], width=2.6, shape="spline", smoothing=0.65),
+        marker=dict(size=5),
+        yaxis="y2",
+        hovertemplate="Purchase share<br>%{x}: %{y:.1f}%<extra></extra>",
+    ))
+    fig.add_hline(y=100, line=dict(color=C["border"], width=1, dash="dot"))
+    fig.update_layout(**_base_layout(
+        height=H_SM + 70,
+        margin=dict(l=54, r=60, t=34, b=46),
+        xaxis=dict(showgrid=False, zeroline=False, dtick=1, tickcolor=C["border"], tickfont=dict(size=16)),
+        yaxis=dict(showgrid=True, gridcolor=C["grid"], zeroline=False, title=dict(text="Applications index (2007=100)", font=dict(size=16, color=C["text"])), tickfont=dict(size=16)),
+        yaxis2=dict(overlaying="y", side="right", showgrid=False, zeroline=False, title=dict(text="Purchase share (%)", font=dict(size=16, color=C["text"])), range=[0, 100], tickfont=dict(size=16)),
+        font=dict(size=16, color=C["text"]),
+    ))
+    return fig
+
+
+def fig_ch7_winner_redistribution(df_scores: pd.DataFrame) -> go.Figure:
+    """
+    Chapter 7 synthesis: one-chart view of who benefited from the post-crisis regime.
+    Expects columns:
+      - group
+      - market_power
+      - financing_edge
+      - asset_capture
+      - regulatory_fit
+    """
+    fig = go.Figure()
+    if df_scores is None or df_scores.empty:
+        return fig
+    need = {"group", "market_power", "financing_edge", "asset_capture", "regulatory_fit"}
+    if not need.issubset(set(df_scores.columns)):
+        return fig
+
+    d = df_scores.copy()
+    comp_cols = ["market_power", "financing_edge", "asset_capture", "regulatory_fit"]
+    # Normalize to a coherent 0-100 composite (each component contributes up to 25).
+    for ccol in comp_cols:
+        d[ccol] = d[ccol].clip(lower=0, upper=100) / 4.0
+    d["total"] = d[comp_cols].sum(axis=1)
+    d = d.sort_values("total", ascending=True)
+
+    parts = [
+        ("market_power", "Market Power Gain", "#334155"),
+        ("financing_edge", "Cost / Financing Advantage", "#B45309"),
+        ("asset_capture", "Asset Capture", "#0F766E"),
+        ("regulatory_fit", "Regulatory Fit", "#BE123C"),
+    ]
+    for col, name, color in parts:
+        fig.add_trace(go.Bar(
+            x=d[col],
+            y=d["group"],
+            name=name,
+            orientation="h",
+            marker_color=color,
+            marker_line=dict(color="rgba(17,17,17,0.15)", width=0.6),
+            hovertemplate=f"{name}<br>%{{y}}: %{{x:.1f}} pts<extra></extra>",
+        ))
+
+    for row in d.itertuples(index=False):
+        fig.add_annotation(
+            x=float(row.total) + 1.5,
+            y=row.group,
+            text=f"{float(row.total):.1f}",
+            showarrow=False,
+            xanchor="left",
+            font=dict(size=11, color=C["text"]),
+        )
+
+    fig.update_layout(**_base_layout(
+        height=max(H, 320 + 18 * len(d)),
+        margin=dict(l=220, r=40, t=36, b=44),
+        barmode="stack",
+        xaxis=dict(
+            showgrid=True, gridcolor=C["grid"], zeroline=False,
+            title=dict(text="Redistribution Advantage Index (0-100 composite)", font=dict(size=16, color=C["text"])),
+            range=[0, 100],
+            tickfont=dict(size=14),
+        ),
+        yaxis=dict(
+            showgrid=False, zeroline=False,
+            tickfont=dict(size=14, color=C["text"]),
+        ),
+        legend=dict(orientation="h", y=-0.18, x=0.0, xanchor="left"),
+        font=dict(size=16, color=C["text"]),
+    ))
+    fig.add_annotation(
+        x=0, y=1.12, xref="paper", yref="paper",
+        text="Higher total = larger post-crisis advantage (stacked components sum to 0-100)",
+        showarrow=False, xanchor="left",
+        font=dict(size=11, color=C["muted"]),
+    )
     return fig
 
 
