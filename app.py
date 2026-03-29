@@ -228,7 +228,7 @@ def G(fig, gid="", keep_legend=False, keep_title=False):
                      style={"width":"100%"})
 
 CHAPTERS = [(1,"The Bet"),(2,"The Crash"),(3,"The Rescue"),
-            (4,"Fake Recovery"),(5,"Who Survived"),(6,"Left Behind"),(7,"New Rules")]
+            (4,"Fake Recovery"),(5,"Who Survived"),(6,"Left Behind"),(7,"New Rules"),(8,"Lessons")]
 
 def navbar(active=1):
     return html.Div([
@@ -423,28 +423,39 @@ def p4(mode):
         insight_chip("The recovery looked large in volume, but much of it was refinance churn rather than new ownership access.", C["crash"]),
 
         card([
+            html.Div("The Refi Mirage: Activity Roared, Ownership Stalled",
+                     style={"fontSize": "16px", "fontWeight": "700", "marginBottom": "2px"}),
+            html.Div("Post-crisis volume rebounded, but much of it was existing owners recycling debt rather than new household entry.",
+                     style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px", "color": "#1A1A1A"}),
             G(ch.fig_ch4_refi_mirage(pr, ho), "ch4-refi-mirage"),
             ann(
-                "When refinance dominates and homeownership stalls, activity is not the same as access.",
+                "Volume recovery was refinance-led, not ownership-led, so activity and access diverged.",
                 "Peak-volume years were debt rotation years, not broad household entry years.",
                 mode,
             ),
         ]),
 
         card([
+            html.Div("The Thirstier Funnel: Better Conversion, Smaller Participation",
+                     style={"fontSize": "16px", "fontWeight": "700", "marginBottom": "2px"}),
+            html.Div("Approval efficiency improved while the applicant pool shrank, revealing a narrower market rather than broader access.",
+                     style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px", "color": "#1A1A1A"}),
             G(ch.fig_ch4_yield_attrition(col, 2007, 2017), "ch4-yield"),
             ann(
-                "The funnel got smaller even as conversion improved, which means fewer total participants made it through.",
+                "The funnel became more selective: stronger conversion rates masked falling participation.",
                 "Efficiency improved on paper, while the addressable market thinned in practice.",
                 mode,
             ),
         ]),
 
         card([
-            html.Div("The Squeezed Middle: middle-income leverage is accelerating fastest", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
+            html.Div("The Squeezed Middle: Leverage Pressure Moved into the Core",
+                     style={"fontSize": "16px", "fontWeight": "700", "marginBottom": "2px"}),
+            html.Div("By the end of recovery, middle-income borrowers were climbing fastest toward higher loan-to-income stress.",
+                     style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px", "color": "#1A1A1A"}),
             G(ch.fig_ch4_lti_income_groups(df_lti), "ch4-lti-groups"),
             ann(
-                "Middle-income leverage has climbed the fastest from trough and is now closest to the safety ceiling.",
+                "Leverage risk migrated from the fringe toward the center of the income distribution.",
                 "The risk center moved toward the middle of the distribution even without being the absolute highest line.",
                 mode,
             ),
@@ -490,8 +501,10 @@ def p5(mode):
 
         # Chart 1 — RVS choropleth
         card([
-            html.Div("Where recovery happened — and how fast",
-                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+            html.Div("Patchwork Recovery: Geography Decided the Clock",
+                     style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("Recovery speed varied sharply by state, creating early winners and long-delay markets.",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
             G(ch.fig_recovery_map_discrete(df_rvs.merge(df_ra[["state", "median_lti_2017"]], on="state", how="left") if (not df_rvs.empty and not df_ra.empty) else df_rvs), "ch5-map"),
             ann("Geography determined survival speed. Oil-state and sun-belt markets bounced back in 1–2 years. "
                 "Sand states — Nevada, Arizona, Florida — took 3–7 years.",
@@ -503,8 +516,10 @@ def p5(mode):
 
         # Chart 2 — Bank vs nonbank slope
         card([
-            html.Div("Who survived — banks handed the market to nonbanks",
-                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+            html.Div("The Great Handover: Banks Retreated, Nonbanks Took Control",
+                     style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("Post-crisis credit returned through a different channel: nonbanks became the dominant origination engine.",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
             G(ch.fig_bank_nonbank_slope(df_bn), "ch5-bnslope"),
             ann("Banks went from 70% to 31% of originations. Nonbanks filled the void — "
                 "but they operate without deposit insurance, without Fed access, and with thinner capital buffers.",
@@ -516,8 +531,10 @@ def p5(mode):
 
         # Chart 3 — Recovery vs affordability scatter
         card([
-            html.Div("The recovery trap - fast recovery, unaffordable outcome",
-                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px"}),
+            html.Div("Recovered but Priced Out: Speed Came with an Affordability Bill",
+                     style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("The fastest-recovering states often ended with higher leverage requirements for buyers.",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
             G(ch.fig_recovery_vs_affordability(df_ra), "ch5-recov-afford"),
             ann("States that recovered fastest — CA, CO, TX — ended up with median LTI above 3x by 2017. "
                 "Recovery and affordability moved in opposite directions.",
@@ -565,21 +582,25 @@ def p6(mode):
         ]),
         insight_chip("Persistently high denial rates meant fewer households could transition into homeownership.", C["crash"]),
         card([
-            html.Div("Generational Split: Boomers Benefited, Younger Households Fell Behind", style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("The Generational Split: Older Owners Held Ground, Younger Buyers Slipped",
+                     style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
             html.Div("Homeownership gains remained concentrated among older owners during the recovery era", style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
             G(ch.fig_ch6_generation_split(df_age), "ch6-gen-gap", keep_legend=True),
             ann(
-                "The before-vs-after slope shows the gap widening from 2007 to 2017, with younger ownership falling more.",
+                "The age gap widened because younger household ownership fell more sharply than older-owner ownership.",
                 "Two-point slopegraph: age 25-34 (young proxy) vs 55-64 (boomer proxy).",
                 mode,
             ),
             src("FRED / BLS Consumer Expenditure Survey age homeownership series"),
         ]),
         card([
-            html.Div("Funnel Leak", style={"fontSize": "13px", "fontWeight": "500", "marginBottom": "8px"}),
+            html.Div("The Funnel Leak: Same Economy, Unequal Passage to Ownership",
+                     style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("At the same period endpoint, low-income applicants lose a larger share before origination.",
+                     style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
             G(ch.fig_ch6_funnel_compare(df_dr, _df_loan_type_share(), 2017), "ch6-sankey"),
             ann(
-                "Side-by-side funnels make the leak visible: the low-income profile loses far more applicants before origination.",
+                "The leakage is structural: lower-income households convert from application to origination at much lower rates.",
                 "Conversion rate is shown directly on each funnel to quantify the disparity.",
                 mode,
             ),
@@ -740,6 +761,107 @@ def p7(mode):
             ], style={"fontSize": "16px", "color": C["text"], "lineHeight": "1.8", "textAlign": "center", "maxWidth": "700px", "margin": "0 auto", "fontStyle": "italic"})
         ], style={"padding": "28px", "borderRadius": "12px", "marginBottom": "16px", "background": C["surface"], "border": f"0.5px solid {C['border']}"}),
     ])
+
+def p8(mode):
+    lt = _df_loan_type_share()
+    pr = _df_purchase_refi()
+    dr = _df_denial_rates()
+
+    # Lesson KPI 1: concentration risk (top channel share in 2007)
+    top_share_2007 = 0.0
+    if not lt.empty and {"year", "share"}.issubset(set(lt.columns)):
+        s07 = lt[lt["year"] == 2007]
+        if len(s07):
+            top_share_2007 = float(s07["share"].max())
+
+    # Lesson KPI 2: decoupling severity (max refi idx - purchase idx)
+    decoupling_gap_idx = 0.0
+    if not pr.empty and {"year", "purchase", "refinance"}.issubset(set(pr.columns)):
+        x = pr[["year", "purchase", "refinance"]].copy().sort_values("year")
+        b = x[x["year"] == 2007]
+        if len(b):
+            bp = float(b["purchase"].iloc[0])
+            br = float(b["refinance"].iloc[0])
+        else:
+            bp = float(x["purchase"].iloc[0]) if len(x) else 0.0
+            br = float(x["refinance"].iloc[0]) if len(x) else 0.0
+        if bp > 0 and br > 0 and len(x):
+            x["purchase_idx"] = (x["purchase"] / bp) * 100.0
+            x["refi_idx"] = (x["refinance"] / br) * 100.0
+            decoupling_gap_idx = float((x["refi_idx"] - x["purchase_idx"]).max())
+
+    # Lesson KPI 3: persistent denial disparity (post-2012, low-income)
+    denial_gap_pp = 0.0
+    if not dr.empty and {"year", "race", "income_band", "denial_rate"}.issubset(set(dr.columns)):
+        wl = dr[(dr["race"] == "White") & (dr["income_band"] == "<50K") & (dr["year"] >= 2012)]
+        bl = dr[(dr["race"] == "Black / African American") & (dr["income_band"] == "<50K") & (dr["year"] >= 2012)]
+        post_w = float(wl["denial_rate"].mean()) if len(wl) else 0.0
+        post_b = float(bl["denial_rate"].mean()) if len(bl) else 0.0
+        denial_gap_pp = (post_b - post_w) * 100.0
+
+    # Goal-oriented scorecard (targets are directional policy guardrails).
+    score = pd.DataFrame([
+        {
+            "lesson": "Channel diversification",
+            "current": top_share_2007 * 100.0,
+            "target": 70.0,  # no single channel above 70%
+            "direction": "lower_better",
+        },
+        {
+            "lesson": "Refi-purchase opportunity gap",
+            "current": decoupling_gap_idx,
+            "target": 30.0,
+            "direction": "lower_better",
+        },
+        {
+            "lesson": "Same-income denial disparity",
+            "current": denial_gap_pp,
+            "target": 10.0,
+            "direction": "lower_better",
+        },
+    ])
+
+    return html.Div([
+        chapter_title(8, "Lessons for the Next Cycle", "Build resilience without rebuilding exclusion."),
+        kpi_row([
+            kpi(f"{top_share_2007:.0%}", "Top channel share (2007)", C["warning"], "Higher concentration = higher systemic fragility"),
+            kpi(f"{decoupling_gap_idx:.1f}", "Peak refi-purchase gap index", C["crash"], "Largest divergence from 2007-indexed activity"),
+            kpi(f"{denial_gap_pp:.1f} pp", "Post-2012 denial gap (<50K)", C["crash"], "Black minus White denial rate"),
+        ]),
+        insight_chip("A safer system needs three guardrails at once: diversified credit channels, a narrower owner-vs-buyer divergence, and reduced same-income denial gaps.", C["warning"]),
+        card([
+            html.Div("The Next-Cycle Scorecard: What to Protect, What to Repair", style={"fontSize":"16px","fontWeight":"700","marginBottom":"2px"}),
+            html.Div("Each KPI is converted to % of target (100 = meets guardrail) for apples-to-apples comparison", style={"fontSize":"13px","fontWeight":"500","marginBottom":"8px","color":"#1A1A1A"}),
+            G(ch.fig_ch8_lessons_scorecard(score), "ch8-scorecard", keep_legend=True),
+            ann(
+                "The risk is not one number; it is a combination of concentration, weak entry, owner-biased recovery, and persistent disparity.",
+                "Targets are directional guardrails for policy design, not fixed thresholds from regulation.",
+                mode,
+            ),
+        ]),
+        card([
+            html.Div("Four Lessons from the Crisis", style={"fontSize":"16px","fontWeight":"700","marginBottom":"10px"}),
+            html.Div([
+                html.Div([
+                    html.Div("1) Do not rebuild a monoculture.", style={"fontWeight":"700","marginBottom":"4px"}),
+                    html.Div("If one channel dominates origination, a single funding shock can freeze the entire market."),
+                ], style={"marginBottom":"10px"}),
+                html.Div([
+                    html.Div("2) Track access, not just volume.", style={"fontWeight":"700","marginBottom":"4px"}),
+                    html.Div("Refinance waves can inflate activity while first-entry ownership remains constrained."),
+                ], style={"marginBottom":"10px"}),
+                html.Div([
+                    html.Div("3) Cheap money is not equal opportunity.", style={"fontWeight":"700","marginBottom":"4px"}),
+                    html.Div("Falling rates help incumbents most unless entry constraints are addressed directly."),
+                ], style={"marginBottom":"10px"}),
+                html.Div([
+                    html.Div("4) Recovery quality must be distribution-aware.", style={"fontWeight":"700","marginBottom":"4px"}),
+                    html.Div("A durable recovery narrows same-income denial gaps instead of simply shifting risk channels."),
+                ]),
+            ], style={"fontSize":"14px","color":C["text"],"lineHeight":"1.5"}),
+        ]),
+    ])
+
 # â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 app.layout = html.Div([
@@ -759,7 +881,7 @@ app.layout = html.Div([
 
 PAGE_MAP = {
     "/chapter/1":(p1,1),"/chapter/2":(p2,2),"/chapter/3":(p3,3),
-    "/chapter/4":(p4,4),"/chapter/5":(p5,5),"/chapter/6":(p6,6),"/chapter/7":(p7,7),
+    "/chapter/4":(p4,4),"/chapter/5":(p5,5),"/chapter/6":(p6,6),"/chapter/7":(p7,7),"/chapter/8":(p8,8),
 }
 
 def _render_page(path: str):

@@ -3277,9 +3277,9 @@ def fig_ch4_lti_income_groups(df: pd.DataFrame) -> go.Figure:
     g = d.groupby(["year", "group"], as_index=False)["lti_ratio"].median().rename(columns={"lti_ratio": "median_lti"})
 
     series = {
-        "Low income (<50K)": {"color": "#9A9A9A", "w": 1.8},
-        "Higher income (100K+)": {"color": "#7E7E7E", "w": 1.8},
-        "Middle income (50-100K)": {"color": C["warning"], "w": 3.6},
+        "Low income (<50K)": {"color": "#7A7A7A", "w": 1.8},
+        "Higher income (100K+)": {"color": "#5E5E5E", "w": 1.8},
+        "Middle income (50-100K)": {"color": "#B22222", "w": 3.6},
     }
     for name, st in series.items():
         s = g[g["group"] == name].sort_values("year")
@@ -3294,15 +3294,15 @@ def fig_ch4_lti_income_groups(df: pd.DataFrame) -> go.Figure:
             hovertemplate=f"{name}<br>%{{x}}: %{{y:.2f}}x<extra></extra>",
         ))
 
-    fig.add_hline(y=3.0, line=dict(color=C["crash"], width=2.4, dash="dash"))
+    fig.add_hline(y=3.0, line=dict(color="#111111", width=2.4, dash="dash"))
     x_mid = float(g["year"].median()) if not g.empty else 2012
     fig.add_annotation(
         x=x_mid, y=3.0,
         text="<b>Safety Ceiling (LTI = 3.0×)</b>",
         showarrow=False,
         yshift=10,
-        font=dict(size=11, color=C["crash"]),
-        bgcolor="rgba(255,255,255,0.92)", bordercolor=C["crash"], borderwidth=0.8, borderpad=3,
+        font=dict(size=11, color="#111111"),
+        bgcolor="rgba(255,255,255,0.94)", bordercolor="#111111", borderwidth=0.8, borderpad=3,
     )
 
     mid = g[g["group"] == "Middle income (50-100K)"].sort_values("year")
@@ -3313,8 +3313,8 @@ def fig_ch4_lti_income_groups(df: pd.DataFrame) -> go.Figure:
             x=float(c["year"]), y=float(c["median_lti"]),
             text=f"Middle-income crosses ceiling ({int(c['year'])})",
             showarrow=True, arrowhead=2, ax=40, ay=-35,
-            font=dict(size=10, color=C["warning"]),
-            bgcolor="rgba(255,255,255,0.95)", bordercolor=C["warning"], borderwidth=0.7, borderpad=3,
+            font=dict(size=10, color="#111111"),
+            bgcolor="rgba(255,255,255,0.95)", bordercolor="#111111", borderwidth=0.7, borderpad=3,
         )
 
     latest_year = int(g["year"].max())
@@ -3331,8 +3331,8 @@ def fig_ch4_lti_income_groups(df: pd.DataFrame) -> go.Figure:
                 x=latest_year, y=mid_v,
                 text=f"Middle-income: +{rise:.2f}x since {trough_year} trough<br>Fastest-rising group — converging on 3.0× ceiling",
                 showarrow=True, arrowhead=2, ax=-210, ay=-40,
-                font=dict(size=10, color=C["warning"]),
-                bgcolor="rgba(255,255,255,0.95)", bordercolor=C["warning"], borderwidth=0.9, borderpad=4,
+                font=dict(size=10, color="#111111"),
+                bgcolor="rgba(255,255,255,0.95)", bordercolor="#111111", borderwidth=0.9, borderpad=4,
             )
 
     # Delta since 2012 callouts (velocity signal)
@@ -3353,7 +3353,7 @@ def fig_ch4_lti_income_groups(df: pd.DataFrame) -> go.Figure:
             x=0.02, y=0.98, xref="paper", yref="paper",
             text=delta_txt,
             showarrow=False, xanchor="left", yanchor="top",
-            font=dict(size=9, color=C["muted"]),
+            font=dict(size=9, color="#111111"),
             bgcolor="rgba(255,255,255,0.92)", bordercolor=C["border"], borderwidth=0.5, borderpad=3,
         )
 
@@ -3696,9 +3696,8 @@ def fig_ch5_recovery_drivers(df: pd.DataFrame) -> go.Figure:
         text=d["state"],
         marker=dict(
             size=14,
-            color=c_norm,
-            colorscale=[[0.0, "#2C7A5A"], [0.5, "#F59E0B"], [1.0, "#D7261E"]],
-            line=dict(color="rgba(17,17,17,0.45)", width=0.8),
+            color="rgba(31,41,55,0.36)",
+            line=dict(color="rgba(17,17,17,0.70)", width=1.2),
             opacity=0.88,
             showscale=False,
         ),
@@ -3713,17 +3712,24 @@ def fig_ch5_recovery_drivers(df: pd.DataFrame) -> go.Figure:
         y_round=d["recovery_years"].round(1),
     )
     for (_, _), g in d_plot.groupby(["x_round", "y_round"], sort=False):
-        shifts = [14, -14, 24, -24, 32, -32]
+        y_shifts = [16, -16, 26, -26, 34, -34]
+        x_shifts = [0, 14, -14, 22, -22, 30]
         for i, row in enumerate(g.itertuples(index=False)):
             base_shift = -14 if float(row.recovery_years) <= y_med else 12
-            yshift = base_shift + shifts[i % len(shifts)]
+            yshift = base_shift + y_shifts[i % len(y_shifts)]
+            xshift = x_shifts[i % len(x_shifts)]
             fig.add_annotation(
                 x=row.employment_recovery_pct,
                 y=row.recovery_years,
-                text=str(row.state),
+                text=f"<b>{str(row.state)}</b>",
                 showarrow=False,
+                xshift=xshift,
                 yshift=yshift,
                 font=dict(size=12, color=C["text"]),
+                bgcolor="rgba(255,255,255,0.92)",
+                bordercolor="rgba(26,26,26,0.35)",
+                borderwidth=0.6,
+                borderpad=2,
             )
     fig.add_annotation(
         x=0.78, y=0.88, xref="paper", yref="paper",
@@ -3733,7 +3739,7 @@ def fig_ch5_recovery_drivers(df: pd.DataFrame) -> go.Figure:
     fig.add_annotation(
         x=0.80, y=0.12, xref="paper", yref="paper",
         text="Friction-dominated (backlogs)",
-        showarrow=False, font=dict(size=12, color=C["crash"]),
+        showarrow=False, font=dict(size=12, color=C["text"]),
     )
     fig.add_annotation(
         x=0.12, y=0.86, xref="paper", yref="paper",
@@ -3746,26 +3752,6 @@ def fig_ch5_recovery_drivers(df: pd.DataFrame) -> go.Figure:
         showarrow=False, xanchor="left", yanchor="top",
         font=dict(size=11, color=C["muted"]),
     )
-    for st, label, ax, ay in [("FL", "High friction despite demand", 24, -26)]:
-        s = d[d["state"] == st]
-        if s.empty:
-            continue
-        r = s.iloc[0]
-        fig.add_annotation(
-            x=float(r["employment_recovery_pct"]),
-            y=float(r["recovery_years"]),
-            text=label,
-            showarrow=True,
-            arrowhead=2,
-            arrowwidth=1.0,
-            ax=ax,
-            ay=ay,
-            font=dict(size=10, color=C["text"]),
-            bgcolor="rgba(255,255,255,0.92)",
-            bordercolor=C["border"],
-            borderwidth=0.6,
-            borderpad=3,
-        )
     fig.update_layout(**_base_layout(
         height=H,
         margin=dict(l=58, r=36, t=40, b=50),
@@ -4108,6 +4094,102 @@ def fig_ch7_winner_redistribution(df_scores: pd.DataFrame) -> go.Figure:
     )
     return fig
 
+
+def fig_ch8_lessons_scorecard(df_lessons: pd.DataFrame) -> go.Figure:
+    """
+    Chapter 8: Policy lessons KPI scorecard.
+    Expected columns:
+      - lesson
+      - current
+      - target
+      - direction ("higher_better" | "lower_better")
+    """
+    fig = go.Figure()
+    if df_lessons is None or df_lessons.empty:
+        return fig
+    need = {"lesson", "current", "target", "direction"}
+    if not need.issubset(set(df_lessons.columns)):
+        return fig
+
+    d = df_lessons.copy()
+    d["lesson"] = d["lesson"].astype(str)
+    d["current"] = pd.to_numeric(d["current"], errors="coerce")
+    d["target"] = pd.to_numeric(d["target"], errors="coerce")
+    d = d.dropna(subset=["lesson", "current", "target"])
+    if d.empty:
+        return fig
+
+    d = d.iloc[::-1].reset_index(drop=True)  # top-to-bottom display order
+    y = d["lesson"]
+
+    # Convert mixed KPI units to a single comparable index:
+    # 100 = target met, >100 = better than target, <100 = below target.
+    def _attainment(row):
+        cur = float(row["current"])
+        tgt = max(float(row["target"]), 1e-6)
+        if str(row["direction"]) == "lower_better":
+            return (tgt / max(cur, 1e-6)) * 100.0
+        return (cur / tgt) * 100.0
+
+    d["attainment"] = d.apply(_attainment, axis=1)
+    d["target_idx"] = 100.0
+    d["met"] = d["attainment"] >= 100.0
+    d["status_color"] = np.where(d["met"], "#2C7A5A", "#D7261E")
+
+    # Range connectors between current and target
+    for row in d.itertuples(index=False):
+        x0 = min(float(row.attainment), float(row.target_idx))
+        x1 = max(float(row.attainment), float(row.target_idx))
+        fig.add_trace(go.Scatter(
+            x=[x0, x1],
+            y=[row.lesson, row.lesson],
+            mode="lines",
+            line=dict(color="rgba(26,26,26,0.30)", width=4),
+            hoverinfo="skip",
+            showlegend=False,
+        ))
+
+    fig.add_trace(go.Scatter(
+        x=d["target_idx"], y=y,
+        mode="markers",
+        name="Target",
+        marker=dict(symbol="diamond", size=11, color="#1F2937"),
+        hovertemplate="Target attainment<br>%{x:.0f}%<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=d["attainment"], y=y,
+        mode="markers+text",
+        name="Current",
+        marker=dict(size=13, color=d["status_color"], line=dict(color="rgba(17,17,17,0.35)", width=0.7)),
+        text=[f"{v:.0f}%" for v in d["attainment"]],
+        textposition="middle right",
+        textfont=dict(size=11, color=C["text"]),
+        customdata=np.column_stack([d["current"], d["target"]]),
+        hovertemplate="Attainment: %{x:.0f}%<br>Current value: %{customdata[0]:.2f}<br>Target value: %{customdata[1]:.2f}<extra></extra>",
+    ))
+
+    x_max = max(160.0, float(d["attainment"].max()) * 1.10)
+    fig.update_layout(**_base_layout(
+        height=max(H_SM + 120, 100 + 70 * len(d)),
+        margin=dict(l=210, r=36, t=26, b=44),
+        xaxis=dict(
+            showgrid=True, gridcolor=C["grid"], zeroline=False,
+            title="% of target (100 = on target)",
+            range=[0, x_max],
+            tickfont=dict(size=12),
+        ),
+        yaxis=dict(showgrid=False, zeroline=False, tickfont=dict(size=13, color=C["text"])),
+        legend=dict(orientation="h", y=1.02, x=0, xanchor="left"),
+        font=dict(size=13, color=C["text"]),
+    ))
+    fig.add_vline(x=100, line=dict(color="rgba(17,17,17,0.45)", width=1.2, dash="dash"))
+    fig.add_annotation(
+        x=0, y=1.10, xref="paper", yref="paper",
+        text="Green = at/above target, red = below target",
+        showarrow=False, xanchor="left",
+        font=dict(size=11, color=C["muted"]),
+    )
+    return fig
 
 
 
